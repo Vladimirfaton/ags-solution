@@ -13,4 +13,5 @@ uploads/
 *.pem
 package-lock.json
 yarn.lock
+.superdesign/tmp/
 bash

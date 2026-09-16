@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/gestion/tableau-de-bord": {
+      "targetKind": "new-ui",
+      "projectId": "8618b2e1-11e7-474a-a337-54f84d733366",
+      "activeDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/init/theme.md",
+        ".superdesign/init/pages.md",
+        "frontend/src/App.jsx",
+        "frontend/src/pages/ManagementDashboard.jsx",
+        "frontend/src/pages/AdminDashboard.jsx",
+        "frontend/src/index.css",
+        "frontend/tailwind.config.js"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "aa809b1dc7bb1612b4f40eb60e30f07b68f09c7167ec7cdd2af83c50e0d5c9f3",
+        ".superdesign/init/theme.md": "c38d4c07ffdbae8a3248e157e1240fe91cfbc2e0444699406b9dc8eb1f99d115",
+        ".superdesign/init/pages.md": "5ec6c46f00cc36f167950a54851f71b9d759aab9134f06fa88c69756a1007a35",
+        "frontend/src/App.jsx": "7ef087bc6003ce1cb4596ac6dfe52eb4d1ad089f06fc805a993dea99350c9a09",
+        "frontend/src/pages/ManagementDashboard.jsx": "af131b8db19ffc8835e7842d41a72a3ad244e0b36106098b57476808f577e07f",
+        "frontend/src/pages/AdminDashboard.jsx": "3b040cd03e28a4453e9d65790f0e1131235528bc9e24921eb774ec6d021f6fc5",
+        "frontend/src/index.css": "9099786538e044d4134c8e6903c038b5f39e9a30590a15b97db1d7d28531ef4a",
+        "frontend/tailwind.config.js": "fdc7e95606737a7a12d1ca309ccf7343d2ad6b13a52c8d86ee7019b77ab0165c"
+      },
+      "components": [
+        {
+          "name": "ManagementShell",
+          "id": "4a3efc0e-f2d1-47af-bd77-84a44e6074e3",
+          "sourcePath": "frontend/src/pages/ManagementDashboard.jsx"
+        }
+      ],
+      "drafts": {
+        "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e": {
+          "title": "Dashboard comptes de gestion - cockpit métier",
+          "visualDirection": "role-based operational cockpit",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-09-16T15:12:00.000Z"
+    },
+    "/admin/tableau-de-bord": {
+      "targetKind": "new-ui",
+      "projectId": "8618b2e1-11e7-474a-a337-54f84d733366",
+      "activeDraftId": "2efd6af9-65c6-4260-bcca-1028fbd25701",
+      "sourceTarget": "/gestion/tableau-de-bord",
+      "sourceDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [".superdesign/design-system.md", ".superdesign/init/theme.md", ".superdesign/init/pages.md", "frontend/src/App.jsx", "frontend/src/pages/ManagementDashboard.jsx", "frontend/src/pages/AdminDashboard.jsx", "frontend/src/index.css", "frontend/tailwind.config.js"],
+      "fingerprints": {".superdesign/design-system.md": "aa809b1dc7bb1612b4f40eb60e30f07b68f09c7167ec7cdd2af83c50e0d5c9f3", ".superdesign/init/theme.md": "c38d4c07ffdbae8a3248e157e1240fe91cfbc2e0444699406b9dc8eb1f99d115", ".superdesign/init/pages.md": "5ec6c46f00cc36f167950a54851f71b9d759aab9134f06fa88c69756a1007a35", "frontend/src/App.jsx": "7ef087bc6003ce1cb4596ac6dfe52eb4d1ad089f06fc805a993dea99350c9a09", "frontend/src/pages/ManagementDashboard.jsx": "af131b8db19ffc8835e7842d41a72a3ad244e0b36106098b57476808f577e07f", "frontend/src/pages/AdminDashboard.jsx": "3b040cd03e28a4453e9d65790f0e1131235528bc9e24921eb774ec6d021f6fc5", "frontend/src/index.css": "9099786538e044d4134c8e6903c038b5f39e9a30590a15b97db1d7d28531ef4a", "frontend/tailwind.config.js": "fdc7e95606737a7a12d1ca309ccf7343d2ad6b13a52c8d86ee7019b77ab0165c"},
+      "drafts": {"2efd6af9-65c6-4260-bcca-1028fbd25701": {"title": "Admin FVS", "visualDirection": "technical platform administration", "parentDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e", "currentVersion": 1}},
+      "updatedAt": "2026-09-16T15:12:00.000Z"
+    },
+    "/gestion/tableau-de-bord/direction": {
+      "targetKind": "new-ui", "projectId": "8618b2e1-11e7-474a-a337-54f84d733366", "activeDraftId": "b9cbb4e2-4d18-41e4-b3f5-2fc04ddd6bab", "sourceTarget": "/gestion/tableau-de-bord", "sourceDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e", "designSystemPath": ".superdesign/design-system.md", "contextFiles": [".superdesign/design-system.md", ".superdesign/init/theme.md", ".superdesign/init/pages.md", "frontend/src/App.jsx", "frontend/src/pages/ManagementDashboard.jsx", "frontend/src/pages/AdminDashboard.jsx", "frontend/src/index.css", "frontend/tailwind.config.js"], "drafts": {"b9cbb4e2-4d18-41e4-b3f5-2fc04ddd6bab": {"title": "Direction", "visualDirection": "school leadership cockpit", "parentDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e", "currentVersion": 1}}, "updatedAt": "2026-09-16T15:12:00.000Z"
+    },
+    "/gestion/tableau-de-bord/secretariat": {
+      "targetKind": "new-ui", "projectId": "8618b2e1-11e7-474a-a337-54f84d733366", "activeDraftId": "945dcde7-b588-4417-acd3-c409341ad113", "sourceTarget": "/gestion/tableau-de-bord", "sourceDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e", "designSystemPath": ".superdesign/design-system.md", "contextFiles": [".superdesign/design-system.md", ".superdesign/init/theme.md", ".superdesign/init/pages.md", "frontend/src/App.jsx", "frontend/src/pages/ManagementDashboard.jsx", "frontend/src/pages/AdminDashboard.jsx", "frontend/src/index.css", "frontend/tailwind.config.js"], "drafts": {"945dcde7-b588-4417-acd3-c409341ad113": {"title": "Secrétariat", "visualDirection": "student records operations", "parentDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e", "currentVersion": 1}}, "updatedAt": "2026-09-16T15:12:00.000Z"
+    },
+    "/gestion/tableau-de-bord/comptabilite": {
+      "targetKind": "new-ui", "projectId": "8618b2e1-11e7-474a-a337-54f84d733366", "activeDraftId": "17471c8b-19a3-40fa-8970-dff252f34a76", "sourceTarget": "/gestion/tableau-de-bord", "sourceDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e", "designSystemPath": ".superdesign/design-system.md", "contextFiles": [".superdesign/design-system.md", ".superdesign/init/theme.md", ".superdesign/init/pages.md", "frontend/src/App.jsx", "frontend/src/pages/ManagementDashboard.jsx", "frontend/src/pages/AdminDashboard.jsx", "frontend/src/index.css", "frontend/tailwind.config.js"], "drafts": {"17471c8b-19a3-40fa-8970-dff252f34a76": {"title": "Comptabilité", "visualDirection": "cash and enrollment cockpit", "parentDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e", "currentVersion": 1}}, "updatedAt": "2026-09-16T15:12:00.000Z"
+    },
+    "/gestion/tableau-de-bord/censeur": {
+      "targetKind": "new-ui", "projectId": "8618b2e1-11e7-474a-a337-54f84d733366", "activeDraftId": "525b8da6-a569-48c1-ac66-807b78d55463", "sourceTarget": "/gestion/tableau-de-bord", "sourceDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e", "designSystemPath": ".superdesign/design-system.md", "contextFiles": [".superdesign/design-system.md", ".superdesign/init/theme.md", ".superdesign/init/pages.md", "frontend/src/App.jsx", "frontend/src/pages/ManagementDashboard.jsx", "frontend/src/pages/AdminDashboard.jsx", "frontend/src/index.css", "frontend/tailwind.config.js"], "drafts": {"525b8da6-a569-48c1-ac66-807b78d55463": {"title": "Censeur", "visualDirection": "academic monitoring cockpit", "parentDraftId": "7d1b4f1a-06cf-4e16-8bd9-6e1bd9b6574e", "currentVersion": 1}}, "updatedAt": "2026-09-16T15:12:00.000Z"
+    }
+  }
+}

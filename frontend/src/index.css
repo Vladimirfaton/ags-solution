@@ -63,3 +63,18 @@ textarea {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* The registration form stores the parent's address and phone together. */
+table.min-w-\[1280px\] th:nth-child(7) {
+  font-size: 0;
+}
+
+table.min-w-\[1280px\] th:nth-child(7)::after {
+  content: 'Adresse et téléphone parent';
+  font-size: 0.75rem;
+}
+
+table.min-w-\[1280px\] th:nth-child(8),
+table.min-w-\[1280px\] td:nth-child(8) {
+  display: none;
+}
