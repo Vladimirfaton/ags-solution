@@ -1,0 +1,15 @@
+import express from 'express';
+import { activateSchoolYear, closeSchoolYear, createSchoolYear, getFinancialConfiguration, getOverview, listClassStudents, listSchoolYears, saveFinancialConfiguration } from '../controllers/directionController.js';
+import { authenticate, authorizePermission } from '../middleware/auth.js';
+
+const router = express.Router();
+router.use(authenticate);
+router.get('/apercu', authorizePermission('etablissement.consulter'), getOverview);
+router.get('/classes/:classId/eleves', authorizePermission('eleve.consulter'), listClassStudents);
+router.get('/annees-scolaires', authorizePermission('annee_scolaire.gerer'), listSchoolYears);
+router.post('/annees-scolaires', authorizePermission('annee_scolaire.gerer'), createSchoolYear);
+router.post('/annees-scolaires/:id/activer', authorizePermission('annee_scolaire.gerer'), activateSchoolYear);
+router.post('/annees-scolaires/:id/cloturer', authorizePermission('annee_scolaire.gerer'), closeSchoolYear);
+router.get('/finances', authorizePermission('frais.gerer'), getFinancialConfiguration);
+router.put('/finances', authorizePermission('frais.gerer'), saveFinancialConfiguration);
+export default router;

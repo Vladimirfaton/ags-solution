@@ -7,6 +7,7 @@ import {
   KeyRound, Mail,Bell,Send, ChevronDown,
 } from 'lucide-react';
 import api, { collegeAPI, classAPI, studentAPI, importAPI, observationAPI, FILE_BASE_URL } from '../services/api';
+import { PLATFORM_NAME } from '../config/branding';
 import ObservationsPanel from '../components/ObservationsPanel';
 import {
   generateBrouillonPDF, generateCollegeBrouillonPDF,
@@ -250,7 +251,7 @@ export default function Dashboard({ onLogout }) {
               <IdCard className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-slate-800 leading-tight">FVS</h1>
+              <h1 className="text-lg font-semibold text-slate-800 leading-tight">{PLATFORM_NAME}</h1>
               <p className="text-xs text-slate-500">Gestion complète des cartes d'identité scolaires</p>
             </div>
           </div>

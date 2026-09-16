@@ -1,5 +1,6 @@
 import axios from 'axios';
 import logger from '../config/logger.js';
+import { PLATFORM_NAME, PLATFORM_SENDER_NAME } from '../config/branding.js';
 
 const BREVO_API_URL = 'https://api.brevo.com/v3';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
@@ -16,10 +17,10 @@ export const sendOtpEmail = async (email, otpCode) => {
       {
         to: [{ email }],
         sender: {
-          name: process.env.SENDER_NAME || 'FVS Admin',
+          name: PLATFORM_SENDER_NAME,
           email: process.env.SENDER_EMAIL || 'noreply@fvs.com',
         },
-        subject: 'Votre code de vérification OTP - FVS',
+        subject: `Votre code de vérification OTP - ${PLATFORM_NAME}`,
         htmlContent: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px;">
@@ -41,7 +42,7 @@ export const sendOtpEmail = async (email, otpCode) => {
               </p>
               <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
               <p style="color: #999; font-size: 12px; text-align: center;">
-                FVS - Plateforme de Cartes d'Identité Scolaires
+                ${PLATFORM_NAME} - Application de gestion scolaire
               </p>
             </div>
           </div>
@@ -70,7 +71,7 @@ export const sendSimpleEmail = async (email, subject, htmlContent) => {
       {
         to: [{ email }],
         sender: {
-          name: process.env.SENDER_NAME || 'FVS Admin',
+          name: PLATFORM_SENDER_NAME,
           email: process.env.SENDER_EMAIL || 'noreply@fvs.com',
         },
         subject,
@@ -90,11 +91,11 @@ export const sendSimpleEmail = async (email, subject, htmlContent) => {
 const roleLabel = (role) => (role === 'directeur' ? 'Directeur / Directrice' : 'Secrétaire');
 
 export const sendActivationEmail = async (email, { role, collegeName, suggestedUsername, accessKey, activationUrl }) => {
-  const subject = `Activation de votre espace FVS - ${collegeName}`;
+  const subject = `Activation de votre espace ${PLATFORM_NAME} - ${collegeName}`;
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #f7faf8; padding: 24px; border-radius: 10px;">
-        <h2 style="color: #059669; margin-bottom: 16px;">Bienvenue sur FVS</h2>
+        <h2 style="color: #059669; margin-bottom: 16px;">Bienvenue sur ${PLATFORM_NAME}</h2>
         <p style="color: #333; font-size: 15px;">
           Un espace de gestion vient d'être créé pour vous en tant que <strong>${roleLabel(role)}</strong>
           du collège <strong>${collegeName}</strong>.
@@ -114,7 +115,7 @@ export const sendActivationEmail = async (email, { role, collegeName, suggestedU
             Activer mon compte
           </a>
         </p>
-        <p style="color: #999; font-size: 12px; text-align: center;">FVS - Plateforme de gestion scolaire</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">${PLATFORM_NAME} - Application de gestion scolaire</p>
       </div>
     </div>
   `;
@@ -122,7 +123,7 @@ export const sendActivationEmail = async (email, { role, collegeName, suggestedU
 };
 
 export const sendReactivationEmail = async (email, { collegeName, accessKey, reactivationUrl }) => {
-  const subject = `Renouvellement de votre accès FVS - ${collegeName}`;
+  const subject = `Renouvellement de votre accès ${PLATFORM_NAME} - ${collegeName}`;
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #f7faf8; padding: 24px; border-radius: 10px;">
@@ -140,7 +141,7 @@ export const sendReactivationEmail = async (email, { collegeName, accessKey, rea
             Renouveler mon accès
           </a>
         </p>
-        <p style="color: #999; font-size: 12px; text-align: center;">FVS - Plateforme de gestion scolaire</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">${PLATFORM_NAME} - Application de gestion scolaire</p>
       </div>
     </div>
   `;
@@ -148,7 +149,7 @@ export const sendReactivationEmail = async (email, { collegeName, accessKey, rea
 };
 
 export const sendLoginLinkEmail = async (email, { role, collegeName, loginUrl }) => {
-  const subject = `Votre espace FVS est activé - ${collegeName}`;
+  const subject = `Votre espace ${PLATFORM_NAME} est activé - ${collegeName}`;
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #f7faf8; padding: 24px; border-radius: 10px;">
@@ -164,7 +165,7 @@ export const sendLoginLinkEmail = async (email, { role, collegeName, loginUrl })
         <p style="color: #666; font-size: 13px; text-align: center;">
           Ou copiez ce lien : <a href="${loginUrl}">${loginUrl}</a>
         </p>
-        <p style="color: #999; font-size: 12px; text-align: center;">FVS - Plateforme de gestion scolaire</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">${PLATFORM_NAME} - Application de gestion scolaire</p>
       </div>
     </div>
   `;
@@ -197,7 +198,7 @@ export const sendBrouillonReadyEmail = async (email, { role, collegeName, classe
             Accéder à mon espace
           </a>
         </p>
-        <p style="color: #999; font-size: 12px; text-align: center;">FVS - Plateforme de gestion scolaire</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">${PLATFORM_NAME} - Application de gestion scolaire</p>
       </div>
     </div>
   `;
@@ -243,7 +244,7 @@ export const sendCartesReadyEmail = async (email, { role, collegeName, classeCod
             Accéder à mon espace
           </a>
         </p>
-        <p style="color: #999; font-size: 12px; text-align: center;">FVS - Plateforme de gestion scolaire</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">${PLATFORM_NAME} - Application de gestion scolaire</p>
       </div>
     </div>
   `;
@@ -275,7 +276,7 @@ export const sendExpirationEmail = async (email, { collegeName, directeurSexe, r
             Renouveler l'accès
           </a>
         </p>
-        <p style="color: #999; font-size: 12px; text-align: center;">FVS - Plateforme de gestion scolaire</p>
+        <p style="color: #999; font-size: 12px; text-align: center;">${PLATFORM_NAME} - Application de gestion scolaire</p>
       </div>
     </div>
   `;

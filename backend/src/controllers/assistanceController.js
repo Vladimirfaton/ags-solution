@@ -1,5 +1,6 @@
 import { sendSimpleEmail } from '../utils/email.js';
 import logger from '../config/logger.js';
+import { PLATFORM_NAME } from '../config/branding.js';
 
 export const sendAssistance = async (req, res) => {
   try {
@@ -20,7 +21,7 @@ export const sendAssistance = async (req, res) => {
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px;">
-        <h2>Demande d'assistance FVS</h2>
+        <h2>Demande d'assistance ${PLATFORM_NAME}</h2>
         <p><strong>De :</strong> ${expediteur}</p>
         <p><strong>Email :</strong> ${email || 'non renseigné'}</p>
         <p><strong>${collegeInfo}</strong></p>
@@ -29,13 +30,13 @@ export const sendAssistance = async (req, res) => {
         <p><strong>Message :</strong></p>
         <p style="white-space: pre-wrap;">${message}</p>
         <hr/>
-        <p style="font-size: 12px; color: #888;">Envoyé depuis la plateforme FVS</p>
+        <p style="font-size: 12px; color: #888;">Envoyé depuis ${PLATFORM_NAME}</p>
       </div>
     `;
 
     await sendSimpleEmail(
       'vladimirfaton@gmail.com',
-      `[FVS Assistance] ${objet}`,
+      `[${PLATFORM_NAME} Assistance] ${objet}`,
       htmlContent
     );
 

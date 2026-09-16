@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { IdCard, Loader2 } from 'lucide-react';
 import { authAPI } from '../services/api';
+import { PLATFORM_NAME } from '../config/branding';
 
 export default function OtpVerification({ onLoginSuccess }) {
   const [otpCode, setOtpCode] = useState('');
@@ -16,7 +17,7 @@ export default function OtpVerification({ onLoginSuccess }) {
 
   useEffect(() => {
     if (location.state?.email) setEmail(location.state.email);
-    else navigate('/login');
+    else navigate('/admin');
   }, [location, navigate]);
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function OtpVerification({ onLoginSuccess }) {
       sessionStorage.setItem('token', token);
       sessionStorage.setItem('user', JSON.stringify(user));
       onLoginSuccess?.();
-      navigate('/dashboard');
+      navigate('/admin/tableau-de-bord');
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur lors de la vérification');
     } finally {
@@ -75,7 +76,7 @@ export default function OtpVerification({ onLoginSuccess }) {
             <IdCard className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-base font-semibold text-slate-800 leading-tight">FVS</h1>
+            <h1 className="text-base font-semibold text-slate-800 leading-tight">{PLATFORM_NAME}</h1>
             <p className="text-xs text-slate-500">Vérification de connexion</p>
           </div>
         </div>
@@ -133,7 +134,7 @@ export default function OtpVerification({ onLoginSuccess }) {
 
         <div className="mt-6 pt-5 border-t border-slate-100 text-center">
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/admin')}
             className="text-xs text-slate-500 hover:text-slate-700 cursor-pointer"
           >
             Retour à la connexion

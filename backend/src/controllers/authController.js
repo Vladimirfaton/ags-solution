@@ -1,378 +1,94 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User.js';
 import logger from '../config/logger.js';
+import { User } from '../models/User.js';
+import { Admin } from '../models/Admin.js';
+import { Session } from '../models/Session.js';
 import { generateOTP, saveOTP, verifyOTP } from '../utils/otpUtils.js';
-import { sendOtpEmail, sendLoginLinkEmail } from '../utils/email.js';
-import { College } from '../models/College.js';
+import { sendOtpEmail, sendSimpleEmail } from '../utils/email.js';
 import { normalizeUsername } from '../utils/username.js';
 import { isValidPassword } from '../utils/validators.js';
-import { verifyReactivationToken } from '../utils/reactivationToken.js';
-import { AccessKey, TRIAL_DURATION_DAYS } from '../models/AccessKey.js';
+import { PLATFORM_NAME } from '../config/branding.js';
+
+const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
+const SESSION_SECONDS = 7 * 24 * 60 * 60;
+const publicUser = (user, accountType = 'gestion') => accountType === 'admin'
+  ? ({ id: user.id, email: user.email, role: 'admin' })
+  : ({ id: user.id, email: user.email, role: user.role, username: user.username, nom: user.nom, prenom: user.prenom, passwordPersonalized: user.password_personalized, permissions: user.permissions || [] });
+const issueSession = async (user, req, accountType = 'gestion') => {
+  const jti = crypto.randomUUID();
+  await Session.create({ accountType, accountId: user.id, tokenId: jti, deviceLabel: req.get('user-agent'), expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000), maxSessions: accountType === 'admin' ? 2 : 1 });
+  return { token: jwt.sign({ id: user.id, email: user.email, role: accountType === 'admin' ? 'admin' : user.role, accountType, jti }, process.env.JWT_SECRET, { expiresIn: `${SESSION_SECONDS}s` }), user: publicUser(user, accountType) };
+};
 
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email et mot de passe requis' });
-    }
-
-    const user = await User.findByEmail(email);
-    if (!user) {
-      logger.warn(`Login attempt with non-existent email: ${email}`);
-      return res.status(401).json({ error: 'Identifiants invalides' });
-    }
-
-    const isValidPasswordMatch = await User.verifyPassword(password, user.password_hash);
-    if (!isValidPasswordMatch) {
-      logger.warn(`Failed login attempt for user: ${email}`);
-      return res.status(401).json({ error: 'Identifiants invalides' });
-    }
-
-    try {
-      const otpCode = generateOTP();
-      await saveOTP(email, otpCode);
-      await sendOtpEmail(email, otpCode);
-
-      logger.info(`OTP sent to ${email}`);
-      return res.json({
-        message: 'Un code OTP a été envoyé à votre email',
-        email: email,
-        requiresOTP: true,
-      });
-    } catch (emailError) {
-      logger.error(`Failed to send OTP: ${emailError.message}`);
-      return res.status(500).json({ error: 'Erreur lors de l\'envoi du code OTP' });
-    }
-  } catch (error) {
-    logger.error(`Login error: ${error.message}`);
-    res.status(500).json({ error: 'Erreur lors de la connexion' });
-  }
+    const user = email && password ? await Admin.findByEmail(email) : null;
+    if (!user || !(await Admin.verifyPassword(password, user.password_hash))) return res.status(401).json({ error: 'Identifiants invalides' });
+    const otpCode = generateOTP(); await saveOTP(user.email, otpCode); await sendOtpEmail(user.email, otpCode);
+    return res.json({ message: 'Un code OTP a été envoyé à votre email', email: user.email, requiresOTP: true });
+  } catch (error) { logger.error(`Login admin: ${error.message}`); return res.status(500).json({ error: "Erreur lors de l'envoi du code OTP" }); }
 };
-
 export const verifyOtpCode = async (req, res) => {
   try {
     const { email, otpCode } = req.body;
-
-    if (!email || !otpCode) {
-      return res.status(400).json({ error: 'Email et code OTP requis' });
-    }
-
-    const isValidOtp = await verifyOTP(email, otpCode);
-    if (!isValidOtp) {
-      logger.warn(`Invalid OTP attempt for: ${email}`);
-      return res.status(401).json({ error: 'Code OTP invalide ou expiré' });
-    }
-
-    const user = await User.findByEmail(email);
-    if (!user) {
-      return res.status(401).json({ error: 'Utilisateur non trouvé' });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
-    );
-
-    logger.info(`User logged in successfully: ${email}`);
-    res.json({
-      token,
-      user: { id: user.id, email: user.email, role: user.role },
-    });
-  } catch (error) {
-    logger.error(`OTP verification error: ${error.message}`);
-    res.status(500).json({ error: 'Erreur lors de la vérification du code' });
-  }
+    if (!email || !otpCode || !(await verifyOTP(email, otpCode))) return res.status(401).json({ error: 'Code OTP invalide ou expiré' });
+    const user = await Admin.findByEmail(email);
+    if (!user || user.status !== 'active') return res.status(401).json({ error: 'Compte indisponible' });
+    return res.json(await issueSession(user, req, 'admin'));
+  } catch (error) { logger.error(`OTP: ${error.message}`); return res.status(500).json({ error: 'Erreur lors de la vérification' }); }
 };
-
 export const register = async (req, res) => {
   try {
     const { email, password, confirmPassword } = req.body;
-
-    if (!email || !password || !confirmPassword) {
-      return res.status(400).json({ error: 'Tous les champs sont requis' });
-    }
-
-    if (password !== confirmPassword) {
-      return res.status(400).json({ error: 'Les mots de passe ne correspondent pas' });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Le mot de passe doit avoir au moins 8 caractères' });
-    }
-
-    const existingUser = await User.findByEmail(email);
-    if (existingUser) {
-      return res.status(409).json({ error: 'Cet email est déjà enregistré' });
-    }
-
-    const user = await User.create(email, password, 'admin');
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
-    );
-
-    logger.info(`New user registered: ${email}`);
-    res.status(201).json({
-      token,
-      user: { id: user.id, email: user.email, role: user.role },
-    });
-  } catch (error) {
-    logger.error(`Registration error: ${error.message}`);
-    res.status(500).json({ error: 'Erreur lors de l\'enregistrement' });
-  }
+    if (!email || !password || !confirmPassword) return res.status(400).json({ error: 'Tous les champs sont requis' });
+    if (password !== confirmPassword || !isValidPassword(password)) return res.status(400).json({ error: 'Mot de passe invalide ou non confirmé' });
+    if (await Admin.count()) return res.status(403).json({ error: 'Le premier administrateur existe déjà.' });
+    return res.status(201).json(await issueSession(await Admin.create(email, password), req, 'admin'));
+  } catch (error) { logger.error(`Création admin: ${error.message}`); return res.status(500).json({ error: "Erreur lors de l'enregistrement" }); }
 };
-
 export const resendOtp = async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email requis' });
-    }
-
-    const user = await User.findByEmail(email);
-    if (!user) {
-      return res.status(404).json({ error: 'Utilisateur non trouvé' });
-    }
-
-    const otpCode = generateOTP();
-    await saveOTP(email, otpCode);
-    await sendOtpEmail(email, otpCode);
-
-    logger.info(`OTP resent to ${email}`);
-    res.json({ message: 'Nouveau code envoyé', email });
-  } catch (error) {
-    logger.error(`Resend OTP error: ${error.message}`);
-    res.status(500).json({ error: "Erreur lors de l'envoi du code" });
-  }
+  try { const user = await Admin.findByEmail(req.body.email || ''); if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' }); const otpCode = generateOTP(); await saveOTP(user.email, otpCode); await sendOtpEmail(user.email, otpCode); return res.json({ message: 'Nouveau code envoyé', email: user.email }); }
+  catch (error) { return res.status(500).json({ error: "Erreur lors de l'envoi du code" }); }
 };
-
-export const verifyToken = (req, res) => {
-  try {
-    const user = req.user;
-    res.json({
-      valid: true,
-      user: { id: user.id, email: user.email, role: user.role },
-    });
-  } catch (error) {
-    res.status(401).json({ valid: false, error: 'Token invalide' });
-  }
-};
-
-// ============================================================================
-// COMPTES DE GESTION (directeur / secrétaire) — pas d'OTP, login username+mdp
-// ============================================================================
-
+export const verifyToken = (req, res) => res.json({ valid: true, user: publicUser(req.user, req.user.accountType) });
 export const loginGestion = async (req, res) => {
   try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: "Nom d'utilisateur et mot de passe requis" });
-    }
-
-    const user = await User.findByUsername(username.trim());
-        if (!user) {
-      return res.status(401).json({ error: 'Identifiants invalides' });
-    }
-
-    if (user.status === 'pending_activation') {
-      return res.status(403).json({
-        error: "Compte non activé. Vérifiez l'email reçu pour l'activer.",
-        code: 'ACCOUNT_PENDING',
-      });
-    }
-    if (user.status === 'expired') {
-      return res.status(403).json({
-        error: 'Accès expiré. Un renouvellement est nécessaire.',
-        code: 'ACCESS_EXPIRED',
-      });
-    }
-
-    const validPassword = await User.verifyPassword(password, user.password_hash);
-    if (!validPassword) {
-      logger.warn(`Failed login attempt for username: ${username}`);
-      return res.status(401).json({ error: 'Identifiants invalides' });
-    }
-
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        college_id: user.college_id,
-        username: user.username,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
-    );
-
-    logger.info(`Management login: ${username} (${user.role})`);
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        college_id: user.college_id,
-        username: user.username,
-        nom: user.nom,
-        prenom: user.prenom,
-      },
-    });
-  } catch (error) {
-    logger.error(`Login gestion error: ${error.message}`);
-    res.status(500).json({ error: 'Erreur lors de la connexion' });
-  }
+    const username = normalizeUsername(req.body.username || ''); const { password } = req.body;
+    const user = username && password ? await User.findByUsername(username) : null;
+    if (!user || !User.isManagementRole(user.role) || !(await User.verifyPassword(password, user.password_hash))) return res.status(401).json({ error: 'Identifiants invalides' });
+    if (user.status !== 'active' || user.disabled_at) return res.status(403).json({ error: 'Compte désactivé', code: 'ACCOUNT_DISABLED' });
+    return res.json(await issueSession(user, req));
+  } catch (error) { logger.error(`Connexion gestion: ${error.message}`); return res.status(500).json({ error: 'Erreur lors de la connexion' }); }
 };
-
-export const activateAccount = async (req, res) => {
+export const getMyProfile = async (req, res) => res.json({ user: publicUser(req.user) });
+export const updateMyProfile = async (req, res) => {
+  try { const user = await User.setProfile(req.user.id, req.body); return res.json({ user: publicUser({ ...user, permissions: req.user.permissions }) }); }
+  catch (error) { return res.status(400).json({ error: 'Impossible de mettre à jour les informations personnelles' }); }
+};
+export const changeMyPassword = async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+  if (!currentPassword || !newPassword || newPassword !== confirmPassword || !isValidPassword(newPassword)) return res.status(400).json({ error: 'Nouveau mot de passe invalide ou non confirmé' });
+  if (!(await User.changePassword(req.user.id, currentPassword, newPassword))) return res.status(401).json({ error: 'Mot de passe actuel incorrect' });
+  return res.json({ success: true });
+};
+export const requestPasswordReset = async (req, res) => {
   try {
-    const { email, accessKey, username, password, confirmPassword } = req.body;
-
-    if (!email || !accessKey || !username || !password || !confirmPassword) {
-      return res.status(400).json({ error: 'Tous les champs sont requis' });
+    const user = await User.findByUsername(normalizeUsername(req.body.username || ''));
+    if (user && User.isManagementRole(user.role) && user.email) {
+      const token = crypto.randomBytes(32).toString('hex');
+      await User.setResetToken(user.id, hash(token), new Date(Date.now() + 30 * 60 * 1000));
+      const url = `${(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '')}/reinitialiser-mot-de-passe?token=${token}`;
+      await sendSimpleEmail(user.email, `Réinitialisation du mot de passe — ${PLATFORM_NAME}`, `<p>Utilisez ce lien dans les 30 minutes :</p><p><a href="${url}">Réinitialiser mon mot de passe</a></p>`);
     }
-    if (password !== confirmPassword) {
-      return res.status(400).json({ error: 'Les mots de passe ne correspondent pas' });
-    }
-    if (!isValidPassword(password)) {
-      return res.status(400).json({
-        error: 'Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule et un chiffre',
-      });
-    }
-
-    const user = await User.findByEmail(email);
-    if (!user || !['directeur', 'secretaire'].includes(user.role)) {
-      return res.status(404).json({ error: 'Compte non trouvé' });
-    }
-    if (user.status !== 'pending_activation') {
-      return res.status(409).json({ error: 'Ce compte a déjà été activé' });
-    }
-
-    const usernameNormalized = normalizeUsername(username);
-    if (!usernameNormalized) {
-      return res.status(400).json({ error: "Nom d'utilisateur invalide" });
-    }
-    const taken = await User.usernameExists(usernameNormalized);
-    if (taken) {
-      return res.status(409).json({ error: "Ce nom d'utilisateur est déjà pris", code: 'USERNAME_TAKEN' });
-    }
-
-    const pendingKey = await AccessKey.verifyPendingKey(user.college_id, accessKey);
-    if (!pendingKey) {
-      return res.status(401).json({ error: "Clé d'accès invalide" });
-    }
-const activatedUser = await User.activateAccount(user.id, usernameNormalized, password);
-    await AccessKey.activate(pendingKey.id, TRIAL_DURATION_DAYS);
-
-    const loginUrl = `${(process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/+$/, '')}/gestion/login`;
-    try {
-      const college = await College.findById(activatedUser.college_id);
-      await sendLoginLinkEmail(activatedUser.email, {
-        role: activatedUser.role,
-        collegeName: college?.nom || '',
-        loginUrl,
-      });
-    } catch (mailErr) {
-      logger.error(`Login link email failed: ${mailErr.message}`);
-    }
-
-    logger.info(`Account activated: ${email} (${activatedUser.role})`);
-    res.json({ activated: true, user: activatedUser });
-  } catch (error) {
-    logger.error(`Activation error: ${error.message}`);
-    res.status(500).json({ error: "Erreur lors de l'activation du compte" });
-  }
+    return res.json({ message: 'Si un email est renseigné pour ce compte, un lien sécurisé vient d’être envoyé.' });
+  } catch (error) { logger.error(`Réinitialisation: ${error.message}`); return res.status(500).json({ error: "Erreur lors de l'envoi" }); }
 };
-
-export const reactivateAccount = async (req, res) => {
-  try {
-    const { email, accessKey, password } = req.body;
-    if (!email || !accessKey || !password) {
-      return res.status(400).json({ error: 'Tous les champs sont requis' });
-    }
-
-    const user = await User.findByEmail(email);
-    if (!user || !['directeur', 'secretaire'].includes(user.role)) {
-      return res.status(404).json({ error: 'Compte non trouvé' });
-    }
-    if (user.status !== 'expired') {
-      return res.status(409).json({ error: "Ce compte n'est pas en attente de renouvellement" });
-    }
-
-    const validPassword = await User.verifyPassword(password, user.password_hash);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Mot de passe incorrect' });
-    }
-
-    const pendingKey = await AccessKey.verifyPendingKey(user.college_id, accessKey);
-    if (!pendingKey) {
-      return res.status(401).json({ error: "Clé d'accès invalide" });
-    }
-
-    const reactivatedUser = await User.reactivate(user.id);
-    await AccessKey.activate(pendingKey.id, 'paid');
-
-    const token = jwt.sign(
-      {
-        id: reactivatedUser.id,
-        email: reactivatedUser.email,
-        role: reactivatedUser.role,
-        college_id: reactivatedUser.college_id,
-        username: reactivatedUser.username,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
-    );
-
-    logger.info(`Account reactivated: ${email}`);
-    res.json({ token, user: reactivatedUser });
-  } catch (error) {
-    logger.error(`Reactivation error: ${error.message}`);
-    res.status(500).json({ error: 'Erreur lors de la réactivation du compte' });
-  }
+export const resetPassword = async (req, res) => {
+  const { token, password, confirmPassword } = req.body;
+  if (!token || !password || password !== confirmPassword || !isValidPassword(password)) return res.status(400).json({ error: 'Mot de passe invalide ou non confirmé' });
+  if (!(await User.resetPassword(hash(token), password))) return res.status(401).json({ error: 'Lien invalide ou expiré' });
+  return res.json({ success: true });
 };
-
-export const checkUsernameAvailability = async (req, res) => {
-  try {
-    const { username } = req.query;
-    if (!username) {
-      return res.status(400).json({ error: "Nom d'utilisateur requis" });
-    }
-    const normalized = normalizeUsername(username);
-    const exists = await User.usernameExists(normalized);
-    res.json({ available: !exists, username: normalized });
-  } catch (error) {
-    logger.error(`Username check error: ${error.message}`);
-    res.status(500).json({ error: 'Erreur lors de la vérification' });
-  }
-};
-// Page publique de réactivation : résout le token en nom de collège, sans login
-export const getReactivationInfo = async (req, res) => {
-  try {
-    const { token } = req.query;
-    if (!token) {
-      return res.status(400).json({ error: 'Token manquant' });
-    }
-
-    let collegeId;
-    try {
-      collegeId = verifyReactivationToken(token);
-    } catch {
-      return res.status(401).json({ error: 'Lien de renouvellement invalide ou expiré' });
-    }
-
-    const college = await College.findById(collegeId);
-    if (!college) {
-      return res.status(404).json({ error: 'Collège non trouvé' });
-    }
-
-    res.json({ collegeId: college.id, collegeName: college.nom });
-  } catch (error) {
-    logger.error(`getReactivationInfo error: ${error.message}`);
-    res.status(500).json({ error: 'Erreur lors de la vérification du lien' });
-  }
-};
+export const bootstrapStatus = async (_req, res) => res.json({ adminExists: (await Admin.count()) > 0 });

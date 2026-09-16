@@ -1,14 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IdCard, Loader2 } from 'lucide-react';
 import { authAPI } from '../services/api';
+import { PLATFORM_CONTACT, PLATFORM_NAME } from '../config/branding';
 
 export default function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [bootstrapAllowed, setBootstrapAllowed] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    authAPI.bootstrapStatus().then(({ data }) => setBootstrapAllowed(!data.adminExists)).catch(() => {});
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -19,7 +25,7 @@ export default function Login({ onLoginSuccess }) {
       const res = await authAPI.login(email, password);
 
       if (res.data.requiresOTP) {
-        navigate('/verify-otp', { state: { email: res.data.email } });
+        navigate('/admin/verifier', { state: { email: res.data.email } });
         return;
       }
 
@@ -27,7 +33,7 @@ export default function Login({ onLoginSuccess }) {
         sessionStorage.setItem('token', token);
         sessionStorage.setItem('user', JSON.stringify(user));
       onLoginSuccess?.();
-      navigate('/dashboard');
+      navigate('/admin/tableau-de-bord');
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur de connexion');
     } finally {
@@ -43,8 +49,8 @@ export default function Login({ onLoginSuccess }) {
             <IdCard className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-base font-semibold text-slate-800 leading-tight">FVS</h1>
-            <p className="text-xs text-slate-500">Cartes d'identité scolaires</p>
+            <h1 className="text-base font-semibold text-slate-800 leading-tight">{PLATFORM_NAME}</h1>
+            <p className="text-xs text-slate-500">Administration scolaire</p>
           </div>
         </div>
 
@@ -90,8 +96,9 @@ export default function Login({ onLoginSuccess }) {
         </form>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          Plateforme interne FVS · +229 01 47 61 14 99
+          {PLATFORM_NAME} · {PLATFORM_CONTACT}
         </p>
+        {bootstrapAllowed && <button onClick={() => navigate('/admin/premier-compte')} className="w-full mt-3 text-xs text-emerald-700">Créer le premier administrateur</button>}
       </div>
     </div>
   );

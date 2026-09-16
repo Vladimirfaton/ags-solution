@@ -4,16 +4,14 @@ import axios from 'axios';
 
 // Pages admin
 import Login from './pages/Login';
+import RegisterAdmin from './pages/RegisterAdmin';
+import ResetPassword from './pages/ResetPassword';
 import OtpVerification from './pages/OtpVerification';
-import Dashboard from './pages/Dashboard';
-import ClassesManagement from './pages/ClassesManagement';
-import CollegeForm from './pages/CollegeForm';
+import AdminDashboard from './pages/AdminDashboard';
 
 // Pages espace gestion (directeur / secrétaire)
 import LoginGestion from './pages/LoginGestion';
-import ActivationCompte from './pages/ActivationCompte';
-import ReactivationCompte from './pages/ReactivationCompte';
-import DashboardGestion from './pages/DashboardGestion';
+import ManagementDashboard from './pages/ManagementDashboard';
 
 const API_URL = import.meta.env.VITE_API_URL;
 axios.defaults.baseURL = API_URL;
@@ -28,7 +26,7 @@ const getStoredUser = () => {
 
 // allowedRoles optionnel : si fourni, restreint la route aux rôles listés
 // et redirige vers le bon dashboard sinon (jamais un 403 silencieux côté UI).
-const PrivateRoute = ({ children, isAuthenticated, loading, allowedRoles }) => {
+const PrivateRoute = ({ children, isAuthenticated, loading, allowedRoles, loginPath = '/gestion' }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#f7faf8]">
@@ -40,12 +38,12 @@ const PrivateRoute = ({ children, isAuthenticated, loading, allowedRoles }) => {
     );
   }
 
-  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!isAuthenticated) return <Navigate to={loginPath} />;
 
   if (allowedRoles) {
     const user = getStoredUser();
     if (!user || !allowedRoles.includes(user.role)) {
-      const fallback = user?.role === 'admin' ? '/dashboard' : '/gestion/dashboard';
+      const fallback = user?.role === 'admin' ? '/admin/tableau-de-bord' : '/gestion/tableau-de-bord';
       return <Navigate to={fallback} />;
     }
   }
@@ -87,17 +85,17 @@ function App() {
 
   const storedUser = getStoredUser();
   const homeRedirect = !isAuthenticated
-    ? '/login'
+    ? '/gestion'
     : storedUser?.role === 'admin'
-      ? '/dashboard'
-      : '/gestion/dashboard';
+      ? '/admin/tableau-de-bord'
+      : '/gestion/tableau-de-bord';
 
   return (
     <Router>
       <Routes>
         {/* --- Admin --- */}
         <Route
-          path="/login"
+          path="/admin"
           element={
             isAuthenticated ? (
               <Navigate to={homeRedirect} />
@@ -107,45 +105,23 @@ function App() {
           }
         />
         <Route
-          path="/verify-otp"
+          path="/admin/verifier"
           element={<OtpVerification onLoginSuccess={() => setIsAuthenticated(true)} />}
         />
+        <Route path="/admin/premier-compte" element={<RegisterAdmin onLoginSuccess={() => setIsAuthenticated(true)} />} />
+        <Route path="/reinitialiser-mot-de-passe" element={<ResetPassword />} />
         <Route
-          path="/dashboard"
+          path="/admin/tableau-de-bord"
           element={
-            <PrivateRoute isAuthenticated={isAuthenticated} loading={loading} allowedRoles={['admin']}>
-              <Dashboard onLogout={handleLogout} />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/colleges/new"
-          element={
-            <PrivateRoute isAuthenticated={isAuthenticated} loading={loading} allowedRoles={['admin']}>
-              <CollegeForm />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/colleges/:collegeId/edit"
-          element={
-            <PrivateRoute isAuthenticated={isAuthenticated} loading={loading} allowedRoles={['admin']}>
-              <CollegeForm />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/colleges/:collegeId/classes"
-          element={
-            <PrivateRoute isAuthenticated={isAuthenticated} loading={loading} allowedRoles={['admin']}>
-              <ClassesManagement />
+            <PrivateRoute isAuthenticated={isAuthenticated} loading={loading} allowedRoles={['admin']} loginPath="/admin">
+              <AdminDashboard onLogout={handleLogout} />
             </PrivateRoute>
           }
         />
 
         {/* --- Espace gestion (directeur / secrétaire) --- */}
         <Route
-          path="/gestion/login"
+          path="/gestion"
           element={
             isAuthenticated ? (
               <Navigate to={homeRedirect} />
@@ -155,36 +131,26 @@ function App() {
           }
         />
         <Route
-          path="/activation-compte"
-          element={<ActivationCompte onLoginSuccess={() => setIsAuthenticated(true)} />}
-        />
-        <Route
-          path="/gestion/activation-compte"
-          element={<ActivationCompte onLoginSuccess={() => setIsAuthenticated(true)} />}
-        />
-        <Route
-          path="/reactivation-compte"
-          element={<ReactivationCompte onLoginSuccess={() => setIsAuthenticated(true)} />}
-        />
-        <Route
-          path="/gestion/reactivation-compte"
-          element={<ReactivationCompte onLoginSuccess={() => setIsAuthenticated(true)} />}
-        />
-        <Route
-          path="/gestion/dashboard"
+          path="/gestion/tableau-de-bord"
           element={
             <PrivateRoute
               isAuthenticated={isAuthenticated}
               loading={loading}
-              allowedRoles={['directeur', 'secretaire']}
+              allowedRoles={['directeur', 'secretaire', 'comptable', 'censeur']}
+              loginPath="/gestion"
             >
-              <DashboardGestion onLogout={handleLogout} />
+              <ManagementDashboard onLogout={handleLogout} />
             </PrivateRoute>
           }
         />
 
         {/* Default redirect */}
         <Route path="/" element={<Navigate to={homeRedirect} />} />
+        <Route path="/login" element={<Navigate to="/admin" replace />} />
+        <Route path="/verify-otp" element={<Navigate to="/admin" replace />} />
+        <Route path="/dashboard" element={<Navigate to="/admin/tableau-de-bord" replace />} />
+        <Route path="/gestion/login" element={<Navigate to="/gestion" replace />} />
+        <Route path="/gestion/dashboard" element={<Navigate to="/gestion/tableau-de-bord" replace />} />
         <Route path="*" element={<Navigate to={homeRedirect} />} />
       </Routes>
     </Router>

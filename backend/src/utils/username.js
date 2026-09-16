@@ -4,7 +4,7 @@ export const normalizeUsername = (value) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // retire les accents
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
+    .replace(/[^a-z0-9-]/g, '');
 
 export const generateUsernameSuggestion = (prenom, nom) =>
   normalizeUsername(`${prenom}${nom}`);

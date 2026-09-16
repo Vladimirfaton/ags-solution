@@ -4,17 +4,14 @@ import dotenv from 'dotenv';
 import logger from './config/logger.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
-import collegeRoutes from './routes/collegeRoutes.js';
-import classRoutes from './routes/classRoutes.js';
-import studentRoutes from './routes/studentRoutes.js';
-import cardRoutes from './routes/cardRoutes.js';
-import locationRoutes from './routes/locationRoutes.js';
 import assistanceRoutes from './routes/assistanceRoutes.js';
-import observationRoutes from './routes/observationRoutes.js';
-import cronRoutes from './routes/cronRoutes.js';
-import configRoutes from './routes/configRoutes.js';
-import webhookRoutes from './routes/webhookRoutes.js';
+import platformRoutes from './routes/platformRoutes.js';
+import directionRoutes from './routes/directionRoutes.js';
+import secretariatRoutes from './routes/secretariatRoutes.js';
+import comptabiliteRoutes from './routes/comptabiliteRoutes.js';
+import censeurRoutes from './routes/censeurRoutes.js';
 import { validateEnv } from './config/validateEnv.js';
+import { PLATFORM_NAME } from './config/branding.js';
 
 dotenv.config();
 validateEnv();
@@ -38,16 +35,12 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/colleges', collegeRoutes);
-app.use('/api/classes', classRoutes);
-app.use('/api/students', studentRoutes);
-app.use('/api/cards', cardRoutes);
-app.use('/api/locations', locationRoutes);
 app.use('/api/assistance', assistanceRoutes);
-app.use('/api/observations', observationRoutes);
-app.use('/api/cron', cronRoutes);
-app.use('/api/config', configRoutes);
-app.use('/api/webhooks', webhookRoutes);
+app.use('/api/platform', platformRoutes);
+app.use('/api/direction', directionRoutes);
+app.use('/api/secretariat', secretariatRoutes);
+app.use('/api/comptabilite', comptabiliteRoutes);
+app.use('/api/censeur', censeurRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -55,7 +48,7 @@ app.get('/health', (req, res) => {
 
 app.use(notFound);
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'FVS backend' });
+  res.json({ status: 'ok', service: `${PLATFORM_NAME} backend` });
 });
 app.use(errorHandler);
 

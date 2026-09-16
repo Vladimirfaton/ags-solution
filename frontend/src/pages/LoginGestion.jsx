@@ -1,16 +1,15 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IdCard, Loader2, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { IdCard, Loader2 } from 'lucide-react';
 import { authAPI } from '../services/api';
+import { PLATFORM_CONTACT, PLATFORM_NAME } from '../config/branding';
 
 export default function LoginGestion({ onLoginSuccess }) {
-  const [searchParams] = useSearchParams();
-  const wasExpired = searchParams.get('expired') === '1';
-
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -26,13 +25,20 @@ export default function LoginGestion({ onLoginSuccess }) {
       sessionStorage.setItem('token', token);
       sessionStorage.setItem('user', JSON.stringify(user));
       onLoginSuccess?.();
-      navigate('/gestion/dashboard');
+      navigate('/gestion/tableau-de-bord');
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur de connexion');
       setErrorCode(err.response?.data?.code || '');
     } finally {
       setLoading(false);
     }
+  };
+
+  const forgotPassword = async () => {
+    if (!username) return setError('Saisissez votre identifiant pour recevoir le lien.');
+    setError('');
+    try { const { data } = await authAPI.requestPasswordReset(username); setNotice(data.message); }
+    catch { setError("Impossible d'envoyer le lien pour le moment."); }
   };
 
   return (
@@ -43,17 +49,10 @@ export default function LoginGestion({ onLoginSuccess }) {
             <IdCard className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-base font-semibold text-slate-800 leading-tight">FVS</h1>
+            <h1 className="text-base font-semibold text-slate-800 leading-tight">{PLATFORM_NAME}</h1>
             <p className="text-xs text-slate-500">Espace de gestion</p>
           </div>
         </div>
-
-        {wasExpired && !error && (
-          <div className="mb-4 flex items-start gap-2 px-4 py-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-sm">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>Votre accès a expiré et votre session a été fermée. Un lien de renouvellement a été envoyé par email au directeur ou à la directrice.</span>
-          </div>
-        )}
 
         {error && (
           <div className="mb-4 px-4 py-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-sm">
@@ -63,13 +62,9 @@ export default function LoginGestion({ onLoginSuccess }) {
                 Activez votre compte via le lien reçu par email.
               </div>
             )}
-            {errorCode === 'ACCESS_EXPIRED' && (
-              <div className="mt-2">
-                Un lien de renouvellement a été envoyé par email au directeur ou à la directrice. Vous pouvez aussi contacter l'assistance.
-              </div>
-            )}
           </div>
         )}
+        {notice && <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm">{notice}</div>}
 
         <form onSubmit={submit} className="space-y-4">
           <div>
@@ -105,9 +100,10 @@ export default function LoginGestion({ onLoginSuccess }) {
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
         </form>
+        <button onClick={forgotPassword} className="mt-4 text-sm text-emerald-700">Mot de passe oublié ?</button>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          Plateforme interne FVS · +229 01 47 61 14 99
+          {PLATFORM_NAME} · {PLATFORM_CONTACT}
         </p>
       </div>
     </div>

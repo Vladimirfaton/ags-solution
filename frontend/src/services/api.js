@@ -19,30 +19,22 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const code = error.response?.data?.code;
     const status = error.response?.status;
 
-    // Expiration détectée sur n'importe quel appel (pas seulement 401) —
-    // déconnexion immédiate, où que l'utilisateur se trouve dans l'app.
-    if (code === 'ACCESS_EXPIRED') {
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('user');
-      if (!window.location.pathname.startsWith('/gestion/login')) {
-        window.location.href = '/gestion/login?expired=1';
-      }
-      return Promise.reject(error);
+    // Les détails d'une erreur 500 restent exclusivement dans les journaux du
+    // serveur. L'interface ne reçoit qu'un message compréhensible et sûr.
+    if (status >= 500 && error.response?.data) {
+      error.response.data.error = 'Une erreur technique est survenue. Réessayez ou contactez l’assistance.';
     }
 
     if (status === 401) {
-      const isOnGestionPage = window.location.pathname.startsWith('/gestion') ||
-        window.location.pathname === '/activation-compte' ||
-        window.location.pathname === '/reactivation-compte';
+      const isOnGestionPage = window.location.pathname.startsWith('/gestion');
       const isLoginAttempt = error.config?.url?.includes('/auth/login');
 
       if (!isLoginAttempt) {
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
-        window.location.href = isOnGestionPage ? '/gestion/login' : '/login';
+        window.location.href = isOnGestionPage ? '/gestion' : '/admin';
       }
     }
     return Promise.reject(error);
@@ -50,6 +42,7 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
+  bootstrapStatus: () => api.get('/auth/bootstrap-status'),
   login: (email, password) => api.post('/auth/login', { email, password }),
   register: (email, password, confirmPassword) =>
     api.post('/auth/register', { email, password, confirmPassword }),
@@ -59,11 +52,51 @@ export const authAPI = {
 
   // Comptes de gestion (directeur/secrétaire)
   loginGestion: (username, password) => api.post('/auth/login-gestion', { username, password }),
-  activateAccount: (data) => api.post('/auth/activation-compte', data),
-  getReactivationInfo: (token) => api.get('/auth/reactivation-info', { params: { token } }),
-  confirmReactivationPayment: ({ token, transactionId }) =>
-    api.post('/auth/reactivation-paiement', { token, transactionId }),
-  checkUsername: (username) => api.get('/auth/username-disponible', { params: { username } }),
+  requestPasswordReset: (username) => api.post('/auth/mot-de-passe-oublie', { username }),
+  resetPassword: (token, password, confirmPassword) => api.post('/auth/reinitialiser-mot-de-passe', { token, password, confirmPassword }),
+  getMyProfile: () => api.get('/auth/mon-profil'),
+  updateMyProfile: (data) => api.put('/auth/mon-profil', data),
+  changeMyPassword: (data) => api.put('/auth/mon-mot-de-passe', data),
+};
+
+export const platformAPI = {
+  setupStatus: () => api.get('/platform/setup-status'),
+  getEstablishment: () => api.get('/platform/etablissement'),
+  overview: () => api.get('/platform/apercu'),
+  initialize: (data) => api.post('/platform/initialisation', data),
+  createSite: (data) => api.post('/platform/sites', data),
+};
+
+export const directionAPI = {
+  overview: () => api.get('/direction/apercu'),
+  listStudentsByClass: (classId) => api.get(`/direction/classes/${classId}/eleves`),
+  createFirstSchoolYear: (data) => api.post('/direction/annee-scolaire-initiale', data),
+  listClasses: () => api.get('/direction/classes'),
+  createClass: (data) => api.post('/direction/classes', data),
+};
+
+export const secretariatAPI = {
+  listClasses: () => api.get('/secretariat/classes'),
+  createClass: (data) => api.post('/secretariat/classes', data),
+  listStudentsByClass: (classId) => api.get(`/secretariat/classes/${classId}/eleves`),
+  updateStudent: (id, data) => api.put(`/secretariat/eleves/${id}`, data),
+  transferStudent: (id, destinationClassId) => api.post(`/secretariat/eleves/${id}/transfert`, { destinationClassId }),
+};
+
+export const comptabiliteAPI = {
+  cashOverview: () => api.get('/comptabilite/caisse'),
+  enrollmentOptions: () => api.get('/comptabilite/inscriptions/options'),
+  createEnrollment: (data) => api.post('/comptabilite/inscriptions', data),
+  paymentOptions: () => api.get('/comptabilite/paiements/options'),
+  createPayment: (data) => api.post('/comptabilite/paiements', data),
+  financialConfiguration: () => api.get('/comptabilite/finances'),
+  saveFinancialConfiguration: (data) => api.put('/comptabilite/finances', data),
+};
+
+export const censeurAPI = {
+  overview: () => api.get('/censeur/apercu'),
+  listClasses: () => api.get('/censeur/classes'),
+  listStudentsByClass: (classId) => api.get(`/censeur/classes/${classId}/eleves`),
 };
 
 export const collegeAPI = {
