@@ -31,7 +31,14 @@ export const authorize = (roles = []) => (req, res, next) => {
 const ROLE_PERMISSIONS = Object.freeze({
 directeur: ['etablissement.consulter', 'annee_scolaire.gerer', 'classe.consulter', 'eleve.consulter'],
 secretaire: ['classe.consulter', 'classe.gerer', 'eleve.consulter', 'eleve.modifier', 'eleve.transferer'],
- comptable: ['classe.consulter', 'eleve.consulter', 'inscription.creer', 'frais.gerer', 'caisse.gerer'],  censeur: ['classe.consulter', 'eleve.consulter'],
+ comptable: ['classe.consulter', 'eleve.consulter', 'inscription.creer', 'frais.gerer', 'caisse.gerer'],
+ censeur: [
+   'classe.consulter',
+   'eleve.consulter',
+   'professeur.consulter',
+   'professeur.gerer',
+   'professeur.affecter_classes',
+ ],
 });
 export const authorizePermission = (...permissions) => (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: 'Non authentifié' });
