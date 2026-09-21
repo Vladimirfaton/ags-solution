@@ -13,7 +13,6 @@ export const listStudentsByClass = async (req, res, next) => {
 };
 export const createClass = async (req, res, next) => {
   try {
-    if (!req.body.nom?.trim()) return res.status(400).json({ error: 'Le nom de la classe est requis.' });
     res.status(201).json({ classe: await AcademicStructure.createAnnualClass(req.body, await accessScopeFor(req.user)) });
   } catch (error) { next(error); }
 };

@@ -1,0 +1,38 @@
+-- reset-data.sql
+-- Vide toutes les tables métier, garde le schéma et les référentiels statiques.
+
+DO $$
+DECLARE
+  r RECORD;
+  exclude_tables TEXT[] := ARRAY[
+    'pgmigrations',          -- suivi des migrations (node-pg-migrate)
+    'niveaux_scolaires',     -- référentiel (6e, 5e, ...)
+    'cycles',                -- référentiel
+    'permissions',           -- référentiel des permissions
+    'profils_acces',         -- référentiel des profils (directeur/secrétaire/...)
+    'profil_permissions'     -- lien profil ↔ permissions (référentiel)
+    'admins'             -- décommente pour garder les comptes admin FVS
+  ];
+BEGIN
+  FOR r IN
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+      AND tablename <> ALL(exclude_tables)
+  LOOP
+    EXECUTE format('TRUNCATE TABLE %I RESTART IDENTITY CASCADE', r.tablename);
+  END LOOP;
+END $$;
+
+INSERT INTO acces_utilisateur_sites (user_id, site_id, designation, portee)
+SELECT u.id, CASE WHEN u.role = 'directeur' THEN NULL ELSE s.id END, u.role,
+  CASE WHEN u.role = 'directeur' THEN 'etablissement' ELSE 'site' END
+FROM users u
+CROSS JOIN (SELECT id FROM sites WHERE est_principal = true LIMIT 1) s
+WHERE u.role IN ('directeur', 'secretaire', 'comptable', 'censeur')
+  AND NOT EXISTS (SELECT 1 FROM acces_utilisateur_sites a WHERE a.user_id = u.id AND a.actif = true);
+
+INSERT INTO acces_utilisateur_profils (acces_id, profil_id)
+SELECT a.id, p.id
+FROM acces_utilisateur_sites a
+JOIN profils_acces p ON p.designation = a.designation
+WHERE NOT EXISTS (SELECT 1 FROM acces_utilisateur_profils ap WHERE ap.acces_id = a.id AND ap.profil_id = p.id);

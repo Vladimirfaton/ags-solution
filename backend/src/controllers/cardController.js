@@ -78,7 +78,7 @@ export const generateFinalCards = async (req, res) => {
           sexe: student.sexe,
           lieu_naissance: student.lieu_naissance,
           nationalite: student.nationalite,
-          adresse: student.adresse,
+          telephone: student.telephone,
           photo_path: student.photo_path,
           qrCode,
         };
@@ -111,7 +111,7 @@ export const generateFinalCards = async (req, res) => {
 export const updateStudentInBrouillon = async (req, res) => {
   try {
     const { studentId } = req.params;
-    const { nom, prenom, date_naissance, sexe, lieu_naissance, nationalite, adresse } = req.body;
+    const { nom, prenom, date_naissance, sexe, lieu_naissance, nationalite, telephone } = req.body;
 
     const student = await Student.findById(studentId);
     if (!student) {
@@ -125,7 +125,7 @@ export const updateStudentInBrouillon = async (req, res) => {
       sexe,
       lieu_naissance,
       nationalite,
-      adresse,
+      telephone,
     });
 
     logger.info(`Student updated in brouillon: ${studentId}`);

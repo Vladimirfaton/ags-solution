@@ -8,7 +8,7 @@ export const createStudent = async (req, res) => {
     const { classId } = req.params;
     const {
       matricule, nom, prenom, sexe, date_naissance,
-      lieu_naissance, nationalite, adresse, telephone,
+      lieu_naissance, nationalite, telephone,
     } = req.body;
 
     if (!matricule || !nom || !prenom) {
@@ -29,7 +29,7 @@ export const createStudent = async (req, res) => {
 
     const student = await Student.create(classId, {
       matricule, nom, prenom, sexe, date_naissance,
-      lieu_naissance, nationalite, adresse, telephone,
+      lieu_naissance, nationalite, telephone,
       photo_path: photoUrl,
     });
 

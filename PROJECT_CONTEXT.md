@@ -1,11 +1,52 @@
 # Contexte durable du projet — AGS-Solution / FVS Cartes
 
-> **Dernière mise à jour :** 4 septembre 2026  
+> **Dernière mise à jour :** 19 septembre 2026  
 > **Usage :** lire ce fichier au début de toute nouvelle discussion liée au projet.
 > Il résume les décisions produit et techniques confirmées. Il ne remplace pas
 > une demande explicite de modification de code.
 
-## Mise à jour d’implémentation — 9 septembre 2026
+## Mise à jour d’implémentation — 19 septembre 2026
+
+### État de validation de l’interface
+
+> **Important : toutes les interfaces ne sont pas encore validées.** Les
+> corrections ci-dessous sont compilées, mais doivent encore être vérifiées
+> dans le navigateur avec des comptes réels pour chaque rôle et sur desktop et
+> mobile.
+
+### Corrections frontend réalisées
+
+- L’espace profil est maintenant disponible pour les comptes directeur,
+  secrétaire, comptable et censeur : consultation en lecture seule, bouton de
+  modification, enregistrement des nom, prénom, email et téléphone.
+- La cause de l’erreur React du profil a été corrigée : le composant `Profile`
+  était utilisé mais absent de `frontend/src/pages/ManagementDashboard.jsx`.
+- La barre de navigation mobile dédiée a été retirée. L’en-tête est compact et
+  tient les informations principales sur une seule ligne ; la navigation desktop
+  reste disponible dans la barre latérale.
+- Le tableau des élèves a été resserré, conserve les informations sur une ligne
+  et affiche de nouveau le téléphone parent/tuteur. Une règle CSS masquait
+  précédemment la colonne du téléphone.
+- L’affichage des classes de la secrétaire et du censeur utilise désormais une
+  liste compacte de type registre scolaire : classe, établissement, effectif et
+  accès à la consultation.
+- Le tableau de bord conserve une vue des classes en lecture simple ; la gestion
+  détaillée reste dans « Classes et élèves ».
+- Le champ d’import Excel du comptable utilise explicitement le curseur
+  `pointer` pour signaler qu’il est sélectionnable.
+- Plusieurs libellés corrompus visibles dans les vues principales ont été
+  corrigés.
+
+### Contrôles effectués
+
+- `frontend`: `npm run build` réussit avec Vite.
+- Les diagnostics VS Code ne signalent pas d’erreur JavaScript/React dans les
+  fichiers corrigés.
+- `npm run lint` n’a pas pu être exécuté car `eslint` n’est pas disponible dans
+  l’installation actuelle.
+- Les parcours fonctionnels et l’affichage de toutes les interfaces restent à
+  tester manuellement avec les quatre rôles, plusieurs tailles d’écran et des
+  données réelles.
 
 ### Décisions devenues effectives dans le code
 
@@ -48,10 +89,15 @@
 
 - Une interface avec menu et page d’accueil par rôle : directeur, secrétaire,
   comptable et censeur.
-- La secrétaire et le censeur disposent de cartes de classes. Cliquer sur une
-  classe ouvre la liste de ses élèves.
-- Le comptable a l’écran d’inscription/réinscription et un tableau de bord de
-  caisse. Les paiements eux-mêmes ne sont pas encore implémentés.
+- La secrétaire et le censeur disposent d’un registre compact de classes. Cliquer
+  sur une classe ouvre la liste de ses élèves.
+- Le directeur dispose d’un tableau de bord de pilotage et d’une vue de classes
+  consultable sans édition directe.
+- Le comptable dispose des écrans d’inscription/réinscription, d’import Excel,
+  de configuration financière et de caisse.
+- Les paiements élèves, reçus internes et rafraîchissements après opération sont
+  reliés dans le frontend et le backend, mais restent à valider en conditions
+  réelles.
 
 ### Reste à réaliser avant un flux financier complet
 
@@ -85,6 +131,56 @@
 - Frontend : Vercel.
 - Backend : Render gratuit. Le serveur se met en veille après 15 minutes sans
   trafic ; cette contrainte est acceptable temporairement.
+
+### Structure actuelle du projet
+
+```text
+projet/
+├── backend/
+│   ├── migrations/              Migrations PostgreSQL et évolution du schéma
+│   ├── src/
+│   │   ├── config/              Base, marque, logs, stockage et environnement
+│   │   ├── controllers/         Logique HTTP par domaine métier
+│   │   ├── middleware/          Authentification, erreurs et limitation de débit
+│   │   ├── models/               Accès aux données et règles de persistance
+│   │   ├── routes/               Routes Express par rôle et fonctionnalité
+│   │   └── utils/                Utilitaires backend et installation
+│   ├── tests/                   Tests Vitest backend
+│   ├── uploads/                 Fichiers Excel, photos et signatures locales
+│   ├── Schema.md                Documentation du schéma de données
+│   └── package.json
+├── frontend/
+│   ├── public/                  Ressources statiques
+│   ├── src/
+│   │   ├── components/          Composants partagés de l’interface
+│   │   ├── config/              Configuration de marque
+│   │   ├── pages/               Écrans admin, gestion et import élèves
+│   │   ├── services/             Client API Axios
+│   │   ├── utils/                Recherche, PDF et utilitaires frontend
+│   │   ├── App.jsx              Routes et protection des espaces
+│   │   ├── index.css             Tailwind et styles globaux
+│   │   └── main.jsx              Point d’entrée React
+│   ├── index.html
+│   ├── tailwind.config.js
+│   ├── vite.config.js
+│   └── package.json
+├── PROJECT_CONTEXT.md            Ce contexte durable
+├── AGENTS.md                     Consignes de collaboration du dépôt
+├── opencode.json                 Configuration d’outillage
+└── skills-lock.json              Versions des skills du projet
+```
+
+### Fichiers frontend récemment concernés
+
+- `frontend/src/pages/ManagementDashboard.jsx` : orchestration des espaces,
+  profil, classes, élèves, inscriptions et caisse.
+- `frontend/src/pages/ManagementWorkspace.jsx` : shell des espaces secrétaire,
+  comptable et censeur.
+- `frontend/src/pages/StudentImportPanel.jsx` : sélection, prévisualisation et
+  confirmation des imports Excel.
+- `frontend/src/index.css` : primitives Tailwind, champs et styles globaux.
+- `frontend/src/utils/searchUtils.js` : recherche normalisée des classes et
+  élèves.
 
 ### Cartes d'identité
 

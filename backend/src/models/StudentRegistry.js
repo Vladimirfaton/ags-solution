@@ -3,7 +3,7 @@ import { pool, query } from '../config/database.js';
 import { FinancialObligation } from './FinancialObligation.js';
 import { scopedWhere } from './AccessScope.js';
 
-const FIELDS = `id, matricule, nom, prenom, sexe, TO_CHAR(date_naissance, 'YYYY-MM-DD') AS date_naissance, lieu_naissance, nationalite, adresse, telephone, created_at, updated_at`;
+const FIELDS = `id, matricule, nom, prenom, sexe, TO_CHAR(date_naissance, 'YYYY-MM-DD') AS date_naissance, lieu_naissance, nationalite, telephone, created_at, updated_at`;
 
 export class StudentRegistry {
   static async list(search = '') {
@@ -28,9 +28,9 @@ export class StudentRegistry {
       if (!annualClass.rowCount) throw Object.assign(new Error('Classe annuelle invalide ou fermée.'), { status: 400, expose: true });
       const existing = await client.query('SELECT id FROM eleves WHERE matricule = $1', [data.matricule.trim()]);
       if (existing.rowCount) throw Object.assign(new Error('Ce matricule existe déjà dans le registre.'), { status: 409, expose: true });
-      const student = await client.query(`INSERT INTO eleves (id, matricule, nom, prenom, sexe, date_naissance, lieu_naissance, nationalite, adresse, telephone)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING ${FIELDS}`,
-      [randomUUID(), data.matricule.trim(), data.nom.trim(), data.prenom.trim(), data.sexe || null, data.date_naissance || null, data.lieu_naissance?.trim() || null, data.nationalite?.trim() || null, data.adresse?.trim() || null, data.telephone?.trim() || null]);
+      const student = await client.query(`INSERT INTO eleves (id, matricule, nom, prenom, sexe, date_naissance, lieu_naissance, nationalite, telephone)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ${FIELDS}`,
+      [randomUUID(), data.matricule.trim(), data.nom.trim(), data.prenom.trim(), data.sexe || null, data.date_naissance || null, data.lieu_naissance?.trim() || null, data.nationalite?.trim() || null, data.telephone?.trim() || null]);
       const enrollment = await client.query(`INSERT INTO inscriptions (eleve_id, annee_scolaire_id, site_id, type_inscription, created_by)
         VALUES ($1,$2,$3,'inscription',$4) RETURNING id`, [student.rows[0].id, context.rows[0].annee_id, annualClass.rows[0].site_id, userId]);
       await client.query('INSERT INTO affectations_inscription (inscription_id, classe_annuelle_id, created_by) VALUES ($1,$2,$3)', [enrollment.rows[0].id, data.annualClassId, userId]);
@@ -58,7 +58,7 @@ export class StudentRegistry {
   static async listByClass(classId, scope) {
     const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
     const result = await query(`SELECT ca.id AS classe_id, ca.code_affichage, e.id, e.matricule, e.nom, e.prenom, e.sexe,
-      TO_CHAR(e.date_naissance, 'YYYY-MM-DD') AS date_naissance, e.lieu_naissance, e.nationalite, e.adresse, e.telephone
+      TO_CHAR(e.date_naissance, 'YYYY-MM-DD') AS date_naissance, e.lieu_naissance, e.nationalite, e.telephone
       FROM classes_annuelles ca
       LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true
       LEFT JOIN inscriptions i ON i.id = ai.inscription_id AND i.statut = 'active'
@@ -76,8 +76,8 @@ export class StudentRegistry {
   }
   static async update(id, data, scope) {
     await this.assertStudentScope(id, scope);
-    const result = await query(`UPDATE eleves SET nom=$1, prenom=$2, sexe=$3, date_naissance=$4, lieu_naissance=$5, nationalite=$6, adresse=$7, telephone=$8, updated_at=CURRENT_TIMESTAMP WHERE id=$9 RETURNING ${FIELDS}`,
-    [data.nom.trim(), data.prenom.trim(), data.sexe || null, data.date_naissance || null, data.lieu_naissance?.trim() || null, data.nationalite?.trim() || null, data.adresse?.trim() || null, data.telephone?.trim() || null, id]);
+    const result = await query(`UPDATE eleves SET nom=$1, prenom=$2, sexe=$3, date_naissance=$4, lieu_naissance=$5, nationalite=$6, telephone=$7, updated_at=CURRENT_TIMESTAMP WHERE id=$8 RETURNING ${FIELDS}`,
+    [data.nom.trim(), data.prenom.trim(), data.sexe || null, data.date_naissance || null, data.lieu_naissance?.trim() || null, data.nationalite?.trim() || null, data.telephone?.trim() || null, id]);
     return result.rows[0] || null;
   }
   static async transfer(studentId, destinationClassId, motif, userId, scope) {

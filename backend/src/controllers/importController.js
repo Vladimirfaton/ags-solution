@@ -95,7 +95,7 @@ const parseExcelRow = (row, headers) => {
   const dateNaissance = toISODate(values[findKeyIndex(headerList, ['date de naissance', 'date naissance', 'ne le'])] ?? '');
   const lieu = getValue(['lieu de naissance', 'lieu naissance', 'lieu']);
   const nationalite = getValue(['nationalite', 'nationalité']);
-  const adresse = getValue(['adresse', 'contact parent', 'telephone parent', 'telephone']);
+  const telephone = getValue(['telephone parent', 'contact parent', 'telephone', 'tel']);
 
   if (!matricule && !nom && !prenom) return null;
 
@@ -107,7 +107,7 @@ const parseExcelRow = (row, headers) => {
     date_naissance: dateNaissance,
     lieu_naissance: cell(lieu),
     nationalite: cell(nationalite),
-    adresse: cell(adresse),
+    telephone: cell(telephone),
   };
 };
 
@@ -250,7 +250,7 @@ export const downloadTemplate = async (req, res) => {
       { header: 'Date de naissance (JJ/MM/AAAA)', key: 'date_naissance', width: 28 },
       { header: 'Lieu de naissance', key: 'lieu_naissance', width: 22 },
       { header: 'Nationalité', key: 'nationalite', width: 16 },
-      { header: 'Contact parent', key: 'adresse', width: 20 },
+      { header: 'Téléphone parent/tuteur', key: 'telephone', width: 20 },
     ];
 
     worksheet.getRow(1).font = { bold: true };
@@ -263,7 +263,7 @@ export const downloadTemplate = async (req, res) => {
       date_naissance: '01/02/2009',
       lieu_naissance: 'Cotonou',
       nationalite: 'BENINOISE',
-      adresse: '0156435678',
+      telephone: '0156435678',
     });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

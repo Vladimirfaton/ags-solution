@@ -14,7 +14,7 @@ const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const SESSION_SECONDS = 7 * 24 * 60 * 60;
 const publicUser = (user, accountType = 'gestion') => accountType === 'admin'
   ? ({ id: user.id, email: user.email, role: 'admin' })
-  : ({ id: user.id, email: user.email, role: user.role, username: user.username, nom: user.nom, prenom: user.prenom, passwordPersonalized: user.password_personalized, permissions: user.permissions || [] });
+  : ({ id: user.id, email: user.email, role: user.role, username: user.username, usernameLocked: user.username_locked, nom: user.nom, prenom: user.prenom, passwordPersonalized: user.password_personalized, permissions: user.permissions || [] });
 const issueSession = async (user, req, accountType = 'gestion') => {
   const jti = crypto.randomUUID();
   await Session.create({ accountType, accountId: user.id, tokenId: jti, deviceLabel: req.get('user-agent'), expiresAt: new Date(Date.now() + SESSION_SECONDS * 1000), maxSessions: accountType === 'admin' ? 2 : 1 });
@@ -65,7 +65,7 @@ export const loginGestion = async (req, res) => {
 export const getMyProfile = async (req, res) => res.json({ user: publicUser(req.user) });
 export const updateMyProfile = async (req, res) => {
   try { const user = await User.setProfile(req.user.id, req.body); return res.json({ user: publicUser({ ...user, permissions: req.user.permissions }) }); }
-  catch (error) { return res.status(400).json({ error: 'Impossible de mettre à jour les informations personnelles' }); }
+  catch (error) { return res.status(error.status || 400).json({ error: error.expose ? error.message : 'Impossible de mettre à jour les informations personnelles' }); }
 };
 export const changeMyPassword = async (req, res) => {
   const { currentPassword, newPassword, confirmPassword } = req.body;

@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { randomUUID } from 'crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { query } from '../../src/config/database.js';
-import { StudentImport } from '../../src/models/StudentImport.js';
+import { MAX_STUDENT_IMPORT_ROWS, StudentImport } from '../../src/models/StudentImport.js';
 import { createSisFixture } from '../helpers/sisFixture.js';
 
 const workbookBuffer = async (headers, row) => {
@@ -66,7 +66,7 @@ describe('StudentImport', () => {
       prenom: 'Jane Marie',
       date_naissance: '2012-03-12',
       lieu_naissance: 'Porto-Novo',
-      adresse: '0197000000',
+      telephone: '0197000000',
     });
   });
 
@@ -161,4 +161,39 @@ describe('StudentImport', () => {
       obligations: 1,
     });
   }, 15000);
+
+  it('refuse un import qui dépasse la limite de lignes', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Élèves');
+    worksheet.addRow([
+      'Matricule',
+      'Nom',
+      'Prénom(s)',
+      'Date de naissance',
+      'Lieu de naissance',
+      'Sexe',
+      'Nationalité',
+      'Contact parent',
+      'Classe',
+    ]);
+
+    for (let index = 0; index <= MAX_STUDENT_IMPORT_ROWS; index += 1) {
+      worksheet.addRow([
+        `LIMIT-${index}`,
+        'Doe',
+        `Student ${index}`,
+        '12/03/2012',
+        'Cotonou',
+        index % 2 ? 'F' : 'M',
+        'Béninoise',
+        '0197000000',
+        sourceClassLabel,
+      ]);
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    await expect(StudentImport.preview(buffer, fixture.scope, fixture.siteId))
+      .rejects.toThrow(`limite de ${MAX_STUDENT_IMPORT_ROWS}`);
+  }, 30000);
 });

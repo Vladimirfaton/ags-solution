@@ -1328,7 +1328,7 @@ function ClassPanel({ cls, students, collegeInfo, onRefresh }) {
 
 const emptyStudent = {
   matricule: '', nom: '', prenom: '', sexe: 'M',
-  date_naissance: '', lieu_naissance: '', nationalite: 'BENINOISE', adresse: '',
+  date_naissance: '', lieu_naissance: '', nationalite: 'BENINOISE', telephone: '',
 };
 
 const ELEVES_TABS = [
@@ -1378,7 +1378,7 @@ function ElevesSection({ classId, students, onRefresh }) {
       date_naissance: s.date_naissance || '',
       lieu_naissance: s.lieu_naissance || '',
       nationalite: s.nationalite || '',
-      adresse: s.adresse || '',
+      telephone: s.telephone || '',
     });
     setEditingId(s.id);
     setPhoto(null);
@@ -1570,7 +1570,7 @@ function ElevesSection({ classId, students, onRefresh }) {
                     <th className="px-4 py-3">Prénom(s)</th>
                     <th className="px-4 py-3">Sexe</th>
                     <th className="px-4 py-3">Date et lieu de naissance</th>
-                    <th className="px-4 py-3">Contact parent</th>
+                    <th className="px-4 py-3">Téléphone parent/tuteur</th>
                     <th className="px-4 py-3">Photo</th>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
@@ -1585,7 +1585,7 @@ function ElevesSection({ classId, students, onRefresh }) {
                       <td className="px-4 py-3 text-slate-600">
                         {formatDateFr(s.date_naissance) || '—'}{s.lieu_naissance ? ` · ${s.lieu_naissance}` : ''}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{s.adresse || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{s.telephone || '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${
                           s.photo_path ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
@@ -1637,7 +1637,7 @@ function ElevesSection({ classId, students, onRefresh }) {
             <Input label="Date de naissance" type="date" value={form.date_naissance} onChange={v => setForm({ ...form, date_naissance: v })} />
             <Input label="Lieu de naissance" value={form.lieu_naissance} onChange={v => setForm({ ...form, lieu_naissance: v })} placeholder="Cotonou" />
             <Input label="Nationalité" value={form.nationalite} onChange={v => setForm({ ...form, nationalite: v })} placeholder="BENINOISE" />
-            <Input label="Contact parent" value={form.adresse} onChange={v => setForm({ ...form, adresse: v })} placeholder="95961070" />
+            <Input label="Téléphone parent/tuteur" value={form.telephone} onChange={v => setForm({ ...form, telephone: v })} placeholder="95961070" />
           </div>
 
           <div className="mb-5">
@@ -1668,7 +1668,7 @@ function ElevesSection({ classId, students, onRefresh }) {
           <Card>
             <p className="text-sm text-slate-700 mb-1 font-medium">1. Télécharger le modèle</p>
             <p className="text-xs text-slate-500 mb-4">
-              Huit colonnes : matricule, nom, prénom, sexe, date de naissance, lieu, nationalité, contact parent.
+              Huit colonnes : matricule, nom, prénom, sexe, date de naissance, lieu, nationalité, téléphone parent/tuteur.
             </p>
             <button onClick={downloadTemplate} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-lg text-sm font-medium cursor-pointer">
               <Download className="w-4 h-4" />
@@ -1802,7 +1802,7 @@ function BrouillonSection({ cls, students, collegeInfo, onRefresh }) {
     setEditingStudent(s.id);
     setEditData({
       nom: s.nom, prenom: s.prenom, sexe: s.sexe, date_naissance: s.date_naissance || '',
-      lieu_naissance: s.lieu_naissance || '', nationalite: s.nationalite || '', adresse: s.adresse || '',
+      lieu_naissance: s.lieu_naissance || '', nationalite: s.nationalite || '', telephone: s.telephone || '',
     });
   };
 
@@ -1916,7 +1916,7 @@ function BrouillonSection({ cls, students, collegeInfo, onRefresh }) {
                     <div><span className="text-xs text-slate-400">Sexe</span><div className="text-slate-700">{s.sexe}</div></div>
                     <div><span className="text-xs text-slate-400">Date et lieu de naissance</span><div className="text-slate-700">{formatDateFr(s.date_naissance) || '—'} {s.lieu_naissance ? `· ${s.lieu_naissance}` : ''}</div></div>
                     <div><span className="text-xs text-slate-400">Nationalité</span><div className="text-slate-700">{s.nationalite || '—'}</div></div>
-                    <div className="col-span-2"><span className="text-xs text-slate-400">Contact parent</span><div className="text-slate-700">{s.adresse || '—'}</div></div>
+                    <div className="col-span-2"><span className="text-xs text-slate-400">Téléphone parent/tuteur</span><div className="text-slate-700">{s.telephone || '—'}</div></div>
                   </div>
 
                   <button
@@ -1956,7 +1956,7 @@ function BrouillonSection({ cls, students, collegeInfo, onRefresh }) {
               <Input label="Lieu de naissance" value={editData.lieu_naissance} onChange={v => setEditData({ ...editData, lieu_naissance: v })} />
               <Input label="Nationalité" value={editData.nationalite} onChange={v => setEditData({ ...editData, nationalite: v })} />
               <div className="col-span-2">
-                <Input label="Contact parent" value={editData.adresse} onChange={v => setEditData({ ...editData, adresse: v })} />
+                <Input label="Téléphone parent/tuteur" value={editData.telephone ?? ''} onChange={v => setEditData({ ...editData, telephone: v })} />
               </div>
             </div>
             <div className="flex gap-2">

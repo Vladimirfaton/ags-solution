@@ -12,7 +12,6 @@ const importUpload = multer({
 	fileFilter: (_req, file, callback) => {
 		const validMimeTypes = [
 			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-			'application/vnd.ms-excel',
 		];
 		if (validMimeTypes.includes(file.mimetype)) return callback(null, true);
 		callback(new Error('Seuls les fichiers Excel sont autorisés.'));

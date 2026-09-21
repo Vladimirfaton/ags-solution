@@ -1,10 +1,40 @@
-import { Building2, CalendarDays, MapPin, School, Users } from 'lucide-react';
+import { Building2, CalendarDays, IdCard, MapPin, School, Users } from 'lucide-react';
 
 const formatNumber = (value) => Number(value || 0).toLocaleString('fr-FR');
+const classRank = (value = '') => {
+  const level = value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
+  const found = level.match(/(?:^|\s)(6|5|4|3)(?:e|eme)?|(?:^|\s)(2nde|2nd|seconde|1ere|1re|tle|terminale)/);
+  const key = found?.[1] || found?.[2] || '';
+
+  return ({
+    6: 1,
+    5: 2,
+    4: 3,
+    3: 4,
+    '2nde': 5,
+    '2nd': 5,
+    seconde: 5,
+    '1ere': 6,
+    '1re': 6,
+    tle: 7,
+    terminale: 7,
+  })[key] || 99;
+};
+
+const sortClasses = (classes = []) => [...classes].sort((a, b) => {
+  const rank = classRank(a.code_affichage) - classRank(b.code_affichage);
+  return rank || a.code_affichage.localeCompare(b.code_affichage, 'fr', {
+    numeric: true,
+    sensitivity: 'base',
+  });
+});
 export default function DirectorCockpit({ direction, yearForm, setYearForm, createYear, loadClass }) {
   const sites = direction?.sites || [];
-  const classes = direction?.classes || [];
+  const classes = sortClasses(direction?.classes || []);
   const totalStudents = sites.reduce((sum, site) => sum + Number(site.students_count || 0), 0);
   const setYear = (key) => (event) => setYearForm({ ...yearForm, [key]: event.target.value });
 
@@ -12,7 +42,7 @@ export default function DirectorCockpit({ direction, yearForm, setYearForm, crea
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Espace Direction</p>
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Cockpit de Direction</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Direction</h2>
         <p className="text-sm text-slate-500">Une vue claire pour piloter l'établissement au quotidien.</p>
       </div>
 
@@ -59,40 +89,76 @@ export default function DirectorCockpit({ direction, yearForm, setYearForm, crea
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {classes.length ? classes.map((item) => (
-                <button key={item.id} type="button" onClick={() => loadClass(item.id)} className="rounded-xl border border-slate-200 p-3 text-left transition hover:border-emerald-400 hover:bg-emerald-50/30">
-                  <p className="font-semibold text-slate-800">{item.code_affichage}</p>
-                  <p className="mt-2 text-xs text-slate-500">{formatNumber(item.effectif)} élève(s)</p>
-                  <p className="mt-3 text-[11px] text-slate-400">{item.site_nom || 'Site principal'}</p>
-                </button>
+              <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
+                <p className="font-semibold text-slate-800">{item.code_affichage}</p>
+                <p className="mt-2 text-xs text-slate-500">{formatNumber(item.effectif)} élève(s)</p>
+                <p className="mt-3 text-[11px] text-slate-400">{item.site_nom || 'Site principal'}</p>
+              </div>
               )) : <EmptyState>Aucune classe active pour le moment.</EmptyState>}
             </div>
           </section>
         </div>
 
         <aside className="space-y-5">
-          <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Configuration</p>
-            <h3 className="mt-2 font-semibold text-slate-900">Lancer une année scolaire</h3>
-            <p className="mt-2 text-xs leading-5 text-slate-500">Activez l'année pour permettre les inscriptions et la gestion des classes.</p>
-            <form onSubmit={createYear} className="mt-5 space-y-3">
-              <Field label="Libellé" placeholder="2025-2026" value={yearForm.libelle} onChange={setYear('libelle')} required />
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Début" type="date" value={yearForm.dateDebut} onChange={setYear('dateDebut')} required />
-                <Field label="Fin" type="date" value={yearForm.dateFin} onChange={setYear('dateFin')} required />
-              </div>
-              <button className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">Activer l'année</button>
-            </form>
-          </section>
+  {!direction?.anneeActive ? (
+    <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Première étape</p>
+      <h3 className="mt-2 font-semibold text-slate-900">Préparer l’année scolaire</h3>
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        Son activation permettra à la secrétaire de créer les classes et au comptable d’enregistrer les inscriptions.
+      </p>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="font-semibold text-slate-900">Alertes & échéances</h3>
-            <div className="mt-4 space-y-3">
-              {!direction?.anneeActive && <Alert tone="amber" title="Année scolaire à configurer" text="Activez une année pour ouvrir les opérations de gestion." />}
-              {!sites.length && <Alert tone="rose" title="Établissement incomplet" text="Vérifiez la configuration du site principal." />}
-              {direction?.anneeActive && sites.length > 0 && <Alert tone="emerald" title="Configuration opérationnelle" text="Les données de l'établissement sont prêtes à être pilotées." />}
-            </div>
-          </section>
-        </aside>
+      <form onSubmit={createYear} className="mt-5 space-y-3">
+        <Field label="Libellé" placeholder="2026-2027" value={yearForm.libelle} onChange={setYear('libelle')} required />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Début" type="month" value={yearForm.dateDebut} onChange={setYear('dateDebut')} required />
+          <Field label="Fin" type="month" value={yearForm.dateFin} onChange={setYear('dateFin')} required />
+        </div>
+        <button className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+          Activer l’année scolaire
+        </button>
+      </form>
+    </section>
+  ) : (
+    <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Année scolaire</p>
+      <h3 className="mt-2 font-semibold text-slate-900">{direction.anneeActive.libelle}</h3>
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        L’année est active. Les opérations de classes et d’inscriptions peuvent se poursuivre.
+      </p>
+    </section>
+  )}
+
+  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex items-start gap-3">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+        <IdCard className="h-4 w-4" />
+      </span>
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">FVS Cartes</p>
+        <h3 className="mt-2 font-semibold text-slate-900">Service non activé</h3>
+        <p className="mt-2 text-xs leading-5 text-slate-500">
+          Les classes et effectifs existants seront transmis au service sans double saisie lorsqu’il sera activé par FVS.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <h3 className="font-semibold text-slate-900">État de l’établissement</h3>
+    <div className="mt-4 space-y-3">
+      {!direction?.anneeActive && (
+        <Alert tone="amber" title="Année scolaire à configurer" text="Activez une année pour ouvrir les opérations de gestion." />
+      )}
+      {!sites.length && (
+        <Alert tone="rose" title="Établissement incomplet" text="La configuration doit être vérifiée par l’administration FVS." />
+      )}
+      {direction?.anneeActive && sites.length > 0 && (
+        <Alert tone="emerald" title="Établissement opérationnel" text="Les informations nécessaires au suivi sont disponibles." />
+      )}
+    </div>
+  </section>
+</aside>
       </div>
     </div>
   );

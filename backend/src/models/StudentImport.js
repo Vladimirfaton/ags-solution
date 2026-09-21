@@ -4,6 +4,8 @@ import { pool, query } from '../config/database.js';
 import { FinancialObligation } from './FinancialObligation.js';
 import { resolveScopedSite } from './AccessScope.js';
 
+export const MAX_STUDENT_IMPORT_ROWS = 10000;
+
 const fail = (message, status = 400, details = null) => {
   const error = Object.assign(new Error(message), { status, expose: true });
   if (details) error.details = details;
@@ -96,7 +98,7 @@ const headerIndexes = (headerValues) => {
     ]),
     sexe: findColumn(headers, ['sexe']),
     nationalite: findColumn(headers, ['nationalite']),
-    adresse: findColumn(headers, ['contact parent']),
+    telephone: findColumn(headers, ['contact parent', 'telephone parent', 'telephone']),
     classe: findColumn(headers, ['classe']),
   };
 };
@@ -113,7 +115,7 @@ const parseWorkbook = async (buffer) => {
   const indexes = headerIndexes(worksheet.getRow(1).values.slice(1));
   const missingHeaders = [];
 
-  for (const field of ['matricule', 'nom', 'prenom', 'sexe', 'nationalite', 'adresse', 'classe']) {
+  for (const field of ['matricule', 'nom', 'prenom', 'sexe', 'nationalite', 'telephone', 'classe']) {
     if (indexes[field] < 0) missingHeaders.push(field);
   }
 
@@ -141,6 +143,9 @@ const parseWorkbook = async (buffer) => {
 
     const values = row.values.slice(1);
     if (!values.some((value) => text(value))) return;
+    if (rows.length >= MAX_STUDENT_IMPORT_ROWS) {
+      fail(`Le fichier dépasse la limite de ${MAX_STUDENT_IMPORT_ROWS} élèves par import.`);
+    }
 
     const valueAt = (index) => (index < 0 ? null : row.getCell(index + 1).value);
     const groupedBirth = indexes.naissanceGroupe < 0
@@ -156,7 +161,7 @@ const parseWorkbook = async (buffer) => {
       lieu_naissance: text(valueAt(indexes.lieuNaissance)) || groupedBirth.lieuNaissance,
       sexe: text(valueAt(indexes.sexe)).toUpperCase(),
       nationalite: text(valueAt(indexes.nationalite)),
-      adresse: text(valueAt(indexes.adresse)),
+      telephone: text(valueAt(indexes.telephone)),
       classe: text(valueAt(indexes.classe)),
     });
   });
@@ -319,7 +324,7 @@ export class StudentImport {
       for (const row of review.rows) {
         const student = await client.query(
           `INSERT INTO eleves
-            (id, matricule, nom, prenom, sexe, date_naissance, lieu_naissance, nationalite, adresse)
+            (id, matricule, nom, prenom, sexe, date_naissance, lieu_naissance, nationalite, telephone)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
            RETURNING id, matricule, nom, prenom`,
           [
@@ -331,7 +336,7 @@ export class StudentImport {
             row.date_naissance,
             row.lieu_naissance,
             row.nationalite || null,
-            row.adresse || null,
+            row.telephone || null,
           ]
         );
 

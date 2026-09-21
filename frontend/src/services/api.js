@@ -70,9 +70,17 @@ export const platformAPI = {
 export const directionAPI = {
   overview: () => api.get('/direction/apercu'),
   listStudentsByClass: (classId) => api.get(`/direction/classes/${classId}/eleves`),
-  createFirstSchoolYear: (data) => api.post('/direction/annee-scolaire-initiale', data),
-  listClasses: () => api.get('/direction/classes'),
-  createClass: (data) => api.post('/direction/classes', data),
+  createFirstSchoolYear: async ({ libelle, dateDebut, dateFin }) => {
+    const { data } = await api.post('/direction/annees-scolaires', {
+      libelle,
+      moisDebut: dateDebut?.slice(0, 7),
+      moisFin: dateFin?.slice(0, 7),
+    });
+    return api.post(`/direction/annees-scolaires/${data.anneeScolaire.id}/activer`);
+  },
+  listSchoolYears: () => api.get('/direction/annees-scolaires'),
+  activateSchoolYear: (id) => api.post(`/direction/annees-scolaires/${id}/activer`),
+  closeSchoolYear: (id) => api.post(`/direction/annees-scolaires/${id}/cloturer`),
 };
 
 export const secretariatAPI = {
@@ -87,6 +95,18 @@ export const comptabiliteAPI = {
   cashOverview: () => api.get('/comptabilite/caisse'),
   enrollmentOptions: () => api.get('/comptabilite/inscriptions/options'),
   createEnrollment: (data) => api.post('/comptabilite/inscriptions', data),
+  previewStudentImport: (file, siteId) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (siteId) formData.append('siteId', siteId);
+    return api.post('/comptabilite/imports/eleves/apercu', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  confirmStudentImport: (file, siteId) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (siteId) formData.append('siteId', siteId);
+    return api.post('/comptabilite/imports/eleves/confirmer', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
   paymentOptions: () => api.get('/comptabilite/paiements/options'),
   createPayment: (data) => api.post('/comptabilite/paiements', data),
   financialConfiguration: () => api.get('/comptabilite/finances'),
@@ -97,6 +117,15 @@ export const censeurAPI = {
   overview: () => api.get('/censeur/apercu'),
   listClasses: () => api.get('/censeur/classes'),
   listStudentsByClass: (classId) => api.get(`/censeur/classes/${classId}/eleves`),
+  listSubjects: () => api.get('/censeur/matieres'),
+  createSubject: (data) => api.post('/censeur/matieres', data),
+  updateSubject: (id, data) => api.put(`/censeur/matieres/${id}`, data),
+  listProfessors: () => api.get('/censeur/professeurs'),
+  createProfessor: (data) => api.post('/censeur/professeurs', data),
+  updateProfessor: (id, data) => api.put(`/censeur/professeurs/${id}`, data),
+  listAssignments: (id) => api.get(`/censeur/professeurs/${id}/affectations`),
+  assignProfessor: (id, data) => api.post(`/censeur/professeurs/${id}/affectations`, data),
+  endAssignment: (id) => api.put(`/censeur/affectations/${id}/terminer`),
 };
 
 export const collegeAPI = {

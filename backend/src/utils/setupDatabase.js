@@ -86,7 +86,6 @@ const createTables = async () => {
         date_naissance DATE,
         lieu_naissance VARCHAR(255),
         nationalite VARCHAR(255),
-        adresse TEXT,
         telephone VARCHAR(30),
         photo_path TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -83,7 +83,6 @@ Comptes de la plateforme — admin (créé via `register`) OU directeur/secréta
 | `sexe` | varchar(1) | oui | — | |
 | `date_naissance` | date | oui | — | |
 | `lieu_naissance`, `nationalite` | varchar | oui | — | |
-| `adresse` | text | oui | — | |
 | `telephone` | varchar(30) | oui | — | |
 | `photo_path` | text | oui | — | URL Supabase Storage |
 | `created_at`, `updated_at` | timestamp | oui | `CURRENT_TIMESTAMP` | |

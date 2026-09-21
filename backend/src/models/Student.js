@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 const CHAMPS = `
   id, classe_id, matricule, nom, prenom, sexe,
   TO_CHAR(date_naissance, 'YYYY-MM-DD') AS date_naissance,
-  lieu_naissance, nationalite, adresse, telephone, photo_path,
+  lieu_naissance, nationalite, telephone, photo_path,
   created_at, updated_at
 `;
 
@@ -12,7 +12,7 @@ export class Student {
   static async create(classeId, data) {
     const {
       matricule, nom, prenom, sexe, date_naissance,
-      lieu_naissance, nationalite, adresse, telephone, photo_path,
+      lieu_naissance, nationalite, telephone, photo_path,
     } = data;
 
     const id = uuidv4();
@@ -20,16 +20,16 @@ export class Student {
     const result = await query(
       `INSERT INTO eleves (
         id, classe_id, matricule, nom, prenom, sexe, date_naissance,
-        lieu_naissance, nationalite, adresse, telephone, photo_path, created_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
+        lieu_naissance, nationalite, telephone, photo_path, created_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
        RETURNING id, classe_id, matricule, nom, prenom, sexe,
                  TO_CHAR(date_naissance, 'YYYY-MM-DD') AS date_naissance,
-                 lieu_naissance, nationalite, adresse, telephone, photo_path,
+                 lieu_naissance, nationalite, telephone, photo_path,
                  created_at, updated_at`,
       [
         id, classeId, matricule, nom, prenom, sexe, date_naissance || null,
-        lieu_naissance || null, nationalite || null, adresse || null,
-        telephone || null, photo_path || null,
+        lieu_naissance || null, nationalite || null, telephone || null,
+        photo_path || null,
       ]
     );
 
@@ -57,21 +57,21 @@ export class Student {
   static async update(id, data) {
     const {
       nom, prenom, sexe, date_naissance,
-      lieu_naissance, nationalite, adresse, telephone,
+      lieu_naissance, nationalite, telephone,
     } = data;
 
     const result = await query(
       `UPDATE eleves
        SET nom = $1, prenom = $2, sexe = $3, date_naissance = $4,
-           lieu_naissance = $5, nationalite = $6, adresse = $7,
-           telephone = $8, updated_at = NOW()
-       WHERE id = $9
+           lieu_naissance = $5, nationalite = $6, telephone = $7,
+           updated_at = NOW()
+       WHERE id = $8
        RETURNING id, classe_id, matricule, nom, prenom, sexe,
                  TO_CHAR(date_naissance, 'YYYY-MM-DD') AS date_naissance,
-                 lieu_naissance, nationalite, adresse, telephone, photo_path,
+                 lieu_naissance, nationalite, telephone, photo_path,
                  created_at, updated_at`,
       [nom, prenom, sexe, date_naissance || null, lieu_naissance || null,
-       nationalite || null, adresse || null, telephone || null, id]
+       nationalite || null, telephone || null, id]
     );
 
     return result.rows[0];
@@ -82,7 +82,7 @@ export class Student {
       `UPDATE eleves SET photo_path = $1, updated_at = NOW() WHERE id = $2
        RETURNING id, classe_id, matricule, nom, prenom, sexe,
                  TO_CHAR(date_naissance, 'YYYY-MM-DD') AS date_naissance,
-                 lieu_naissance, nationalite, adresse, telephone, photo_path,
+                 lieu_naissance, nationalite, telephone, photo_path,
                  created_at, updated_at`,
       [photoPath, id]
     );
@@ -97,7 +97,7 @@ export class Student {
     const result = await query(
       `SELECT e.id, e.classe_id, e.matricule, e.nom, e.prenom, e.sexe,
               TO_CHAR(e.date_naissance, 'YYYY-MM-DD') AS date_naissance,
-              e.lieu_naissance, e.nationalite, e.adresse, e.telephone, e.photo_path,
+              e.lieu_naissance, e.nationalite, e.telephone, e.photo_path,
               c.code AS classe_code
        FROM eleves e
        JOIN classes c ON e.classe_id = c.id

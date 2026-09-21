@@ -715,7 +715,7 @@ function ElevesTab({ students, classId, isSecretaire }) {
               <th className="px-4 py-3">Date de naissance</th>
               <th className="px-4 py-3">Lieu</th>
               <th className="px-4 py-3">Nationalité</th>
-              <th className="px-4 py-3">Contact parent</th>
+              <th className="px-4 py-3">Téléphone parent/tuteur</th>
               {isSecretaire && <th className="px-4 py-3 text-right">Action</th>}
             </tr>
           </thead>
@@ -736,7 +736,7 @@ function ElevesTab({ students, classId, isSecretaire }) {
                 <td className="px-4 py-3 text-slate-600">{formatDateFr(s.date_naissance) || '—'}</td>
                 <td className="px-4 py-3 text-slate-600">{s.lieu_naissance || '—'}</td>
                 <td className="px-4 py-3 text-slate-600">{s.nationalite || '—'}</td>
-                <td className="px-4 py-3 text-slate-600">{s.adresse || '—'}</td>
+                <td className="px-4 py-3 text-slate-600">{s.telephone || '—'}</td>
                 {isSecretaire && (
                   <td className="px-4 py-3 text-right">
                     <button
@@ -797,7 +797,7 @@ function BrouillonTab({ cls, students, college }) {
       <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6">
         <p className="text-sm font-medium text-slate-800 mb-1">Exporter le brouillon</p>
         <p className="text-xs text-slate-500 mb-4">
-          Liste complète A4 paysage — photo, matricule, nom, prénom, classe, date et lieu de naissance, nationalité, contact parent.
+          Liste complète A4 paysage — photo, matricule, nom, prénom, classe, date et lieu de naissance, nationalité, téléphone parent/tuteur.
         </p>
         <button
           onClick={exportPDF}

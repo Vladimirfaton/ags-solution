@@ -988,7 +988,7 @@ const BROUILLON_COLUMNS = [
   { key: 'date_naissance', label: 'Date de naissance', width: 80 },
   { key: 'lieu_naissance', label: 'Lieu de naissance', width: 100 },
   { key: 'nationalite', label: 'Nationalité', width: 100 },
-  { key: 'adresse', label: 'Contact parent', width: 126.89 },
+  { key: 'telephone', label: 'Téléphone parent/tuteur', width: 126.89 },
 ];
 
 const appendClassBrouillonPages = async (pdfDoc, font, fontBold, students, classInfo, collegeInfo) => {
