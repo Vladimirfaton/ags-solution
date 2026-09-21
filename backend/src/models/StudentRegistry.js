@@ -110,4 +110,60 @@ export class StudentRegistry {
       throw error;
     } finally { client.release(); }
   }
+  static async listForEstablishment(search = '', scope, page = 1, pageSize = 10) {
+    const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
+    const term = `%${search.trim()}%`;
+    const offset = (Math.max(1, page) - 1) * pageSize;
+
+    const [rows, count] = await Promise.all([
+      query(`SELECT e.id, e.matricule, e.nom, e.prenom, e.sexe, ca.code_affichage, s.nom AS site_nom, n.ordre
+        FROM eleves e
+        JOIN inscriptions i ON i.eleve_id = e.id AND i.statut = 'active' AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
+        JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+        JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+        JOIN classes c ON c.id = ca.classe_id
+        JOIN niveaux_scolaires n ON n.code = c.niveau_code
+        JOIN sites s ON s.id = ca.site_id
+        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${siteFilter.sql}
+        ORDER BY n.ordre, ca.division_nom, e.nom, e.prenom
+        LIMIT $${siteFilter.params.length + 2} OFFSET $${siteFilter.params.length + 3}`,
+        [term, ...siteFilter.params, pageSize, offset]),
+      query(`SELECT COUNT(*)::int AS total
+        FROM eleves e
+        JOIN inscriptions i ON i.eleve_id = e.id AND i.statut = 'active' AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
+        JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+        JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${siteFilter.sql}`,
+        [term, ...siteFilter.params]),
+    ]);
+
+    return { students: rows.rows, total: count.rows[0].total, page, pageSize };
+  }   
+    static async listForEstablishment(search = '', scope, page = 1, pageSize = 10) {
+    const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
+    const term = `%${search.trim()}%`;
+    const offset = (Math.max(1, page) - 1) * pageSize;
+    const [rows, count] = await Promise.all([
+      query(`SELECT e.id, e.matricule, e.nom, e.prenom, e.sexe, ca.code_affichage, s.nom AS site_nom, n.ordre
+        FROM eleves e
+        JOIN inscriptions i ON i.eleve_id = e.id AND i.statut = 'active' AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
+        JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+        JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+        JOIN classes c ON c.id = ca.classe_id
+        JOIN niveaux_scolaires n ON n.code = c.niveau_code
+        JOIN sites s ON s.id = ca.site_id
+        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${siteFilter.sql}
+        ORDER BY n.ordre, ca.division_nom, e.nom, e.prenom
+        LIMIT $${siteFilter.params.length + 2} OFFSET $${siteFilter.params.length + 3}`,
+        [term, ...siteFilter.params, pageSize, offset]),
+      query(`SELECT COUNT(*)::int AS total
+        FROM eleves e
+        JOIN inscriptions i ON i.eleve_id = e.id AND i.statut = 'active' AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
+        JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+        JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${siteFilter.sql}`,
+        [term, ...siteFilter.params]),
+    ]);
+    return { students: rows.rows, total: count.rows[0].total, page, pageSize };
+  }
 }

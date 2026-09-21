@@ -68,3 +68,11 @@ export const saveFinancialConfiguration = async (req, res, next) => {
     ));
   } catch (error) { next(error); }
 };
+export const getEstablishmentStudents = async (req, res, next) => {
+  try {
+    const { StudentRegistry } = await import('../models/StudentRegistry.js');
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
+    res.json(await StudentRegistry.listForEstablishment(req.query.recherche || '', await accessScopeFor(req.user), page, pageSize));
+  } catch (error) { next(error); }
+};

@@ -1,4 +1,5 @@
 import { Building2, CalendarDays, IdCard, MapPin, School, Users } from 'lucide-react';
+import EstablishmentStudentsPanel from './EstablishmentStudentsPanel';
 
 const formatNumber = (value) => Number(value || 0).toLocaleString('fr-FR');
 const classRank = (value = '') => {
@@ -97,6 +98,7 @@ export default function DirectorCockpit({ direction, yearForm, setYearForm, crea
               )) : <EmptyState>Aucune classe active pour le moment.</EmptyState>}
             </div>
           </section>
+          <EstablishmentStudentsPanel />
         </div>
 
         <aside className="space-y-5">

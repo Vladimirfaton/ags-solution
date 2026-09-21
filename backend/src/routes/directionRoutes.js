@@ -1,5 +1,5 @@
 import express from 'express';
-import { activateSchoolYear, closeSchoolYear, createSchoolYear, getFinancialConfiguration, getOverview, listClassStudents, listSchoolYears, saveFinancialConfiguration } from '../controllers/directionController.js';
+import { activateSchoolYear, closeSchoolYear, createSchoolYear, getEstablishmentStudents, getFinancialConfiguration, getOverview, listClassStudents, listSchoolYears, saveFinancialConfiguration } from '../controllers/directionController.js';
 import { authenticate, authorizePermission } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -12,4 +12,5 @@ router.post('/annees-scolaires/:id/activer', authorizePermission('annee_scolaire
 router.post('/annees-scolaires/:id/cloturer', authorizePermission('annee_scolaire.gerer'), closeSchoolYear);
 router.get('/finances', authorizePermission('frais.gerer'), getFinancialConfiguration);
 router.put('/finances', authorizePermission('frais.gerer'), saveFinancialConfiguration);
+router.get('/eleves', authorizePermission('eleve.consulter'), getEstablishmentStudents);
 export default router;

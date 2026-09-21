@@ -81,6 +81,7 @@ export const directionAPI = {
   listSchoolYears: () => api.get('/direction/annees-scolaires'),
   activateSchoolYear: (id) => api.post(`/direction/annees-scolaires/${id}/activer`),
   closeSchoolYear: (id) => api.post(`/direction/annees-scolaires/${id}/cloturer`),
+listStudents: (search = '', page = 1) => api.get('/direction/eleves', { params: { recherche: search, page, pageSize: 10 } }),
 };
 
 export const secretariatAPI = {

@@ -34,7 +34,7 @@ export class AcademicStructure {
     if (!cycle.rowCount) cycle = await query("INSERT INTO cycles (nom, ordre, type_division) VALUES ('Cycle général', 1, 'libre') RETURNING id");
     let classe = await query('SELECT id FROM classes WHERE cycle_id = $1 AND niveau_code = $2', [cycle.rows[0].id, niveauCode]);
     if (!classe.rowCount) classe = await query('INSERT INTO classes (cycle_id, nom, ordre, niveau_code) VALUES ($1, $2, $3, $4) RETURNING id', [cycle.rows[0].id, libelle, ordre, niveauCode]);
-    const code = `${libelle} — ${divisionLabel(divisionType)} ${cleanDivision}`;
+    const code = `${libelle}-${divisionLabel(divisionType)} ${cleanDivision}`;
     const created = await query(`INSERT INTO classes_annuelles (annee_scolaire_id, site_id, classe_id, division_nom, division_type, code_affichage) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, code_affichage, division_nom, division_type, actif`, [context.year.id, context.site.id, classe.rows[0].id, cleanDivision, divisionType, code]);
     return created.rows[0];
   }

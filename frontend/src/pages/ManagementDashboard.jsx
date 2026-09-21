@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Banknote, Building2, CalendarDays, ChevronLeft, IdCard, KeyRound, LayoutDashboard, LogOut, MapPin, Pencil, Plus, Save, School, Search, UserPlus, UserRound, Users } from 'lucide-react';
+import { Banknote, Building2, CalendarDays, ChevronLeft, ChevronRight, IdCard, KeyRound, LayoutDashboard, LogOut, MapPin, Pencil, Plus, Save, School, Search, UserPlus, UserRound, Users } from 'lucide-react';
 import { authAPI, censeurAPI, comptabiliteAPI, directionAPI, platformAPI, secretariatAPI } from '../services/api';
 import { PLATFORM_NAME } from '../config/branding';
 import { generatePaymentReceiptPDF } from '../utils/paymentReceipt';
@@ -232,32 +232,27 @@ function SecretaryHome({ secretaryClasses, setSection, loadClass }) {
             </button>
           </div>
 
-          {classes.length ? (
-            <div className="divide-y divide-slate-100">
-              {classes.slice(0, 6).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setSection('classes');
-                    loadClass(item.id);
-                  }}
-                  className="flex w-full items-center justify-between gap-4 py-4 text-left transition hover:bg-emerald-50/40"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-800">{item.code_affichage}</p>
-                    <p className="mt-1 truncate text-xs text-slate-500">
-                      {item.site_nom || 'Site principal'}
-                    </p>
-                  </div>
+              {classes.length ? (
+              <div className="divide-y divide-slate-100">
+                {classes.slice(0, 6).map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex w-full items-center justify-between gap-4 py-4"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800">{item.code_affichage}</p>
+                      <p className="mt-1 truncate text-xs text-slate-500">
+                        {item.site_nom || 'Site principal'}
+                      </p>
+                    </div>
 
-                  <span className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
-                    {item.effectif || 0} élève(s)
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
+                    <span className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
+                      {item.effectif || 0} élève(s)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div className="rounded-xl border border-dashed border-slate-200 p-5">
               <p className="text-sm font-medium text-slate-700">Aucune classe annuelle.</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
@@ -304,6 +299,19 @@ function SecretaryHome({ secretaryClasses, setSection, loadClass }) {
     </div>
   );
 }
+function Modal({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-semibold text-slate-900">{title}</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700">✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 function ClassRegistry({ editable, secretaryClasses, censeurClasses, classDetail, loadClass, setClassDetail, classForm, setClassForm, createClass, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent, establishmentName }) {
   const classes = editable ? secretaryClasses : censeurClasses;
   const [search, setSearch] = useState('');
@@ -337,24 +345,147 @@ function LegacyClassStudents({ editable, classes, classDetail, setClassDetail, e
   return <>
     <button onClick={() => setClassDetail(null)} className="text-sm text-emerald-700 flex gap-1 mb-4"><ChevronLeft className="w-4"/>Retour aux classes</button>
     <Title title={classDetail.classInfo.code_affichage} subtitle={`${students.length} élève(s) affecté(s) à cette classe`}/>
-    {editingStudent && <Panel title={`Modifier la fiche de ${editingStudent.nom} ${editingStudent.prenom}`} action={<button onClick={() => setEditingStudent(null)} className="text-sm">Annuler</button>}><form onSubmit={updateStudent} className="grid sm:grid-cols-2 gap-3"><Input label="Nom" value={editingStudent.nom || ''} onChange={setEdit('nom')} required/><Input label="Prénom" value={editingStudent.prenom || ''} onChange={setEdit('prenom')} required/><Input label="Date de naissance" type="date" value={editingStudent.date_naissance || ''} onChange={setEdit('date_naissance')}/><Input label="Lieu de naissance" value={editingStudent.lieu_naissance || ''} onChange={setEdit('lieu_naissance')}/><Input label="Nationalité" value={editingStudent.nationalite || ''} onChange={setEdit('nationalite')}/><Input label="Téléphone parent/tuteur" value={editingStudent.telephone ||''} onChange={setEdit('telephone')}/><label className="text-sm">Sexe<select value={editingStudent.sexe || ''} onChange={setEdit('sexe')} className="input"><option value="">Non renseigné</option><option value="M">Masculin</option><option value="F">Féminin</option></select></label><button className="sm:col-span-2 primary">Enregistrer les modifications</button></form></Panel>}
-    {transferStudent && <Panel title={`Transférer ${transferStudent.nom} ${transferStudent.prenom}`} action={<button onClick={() => setTransferStudent(null)} className="text-sm">Annuler</button>}><form onSubmit={moveStudent} className="grid sm:grid-cols-2 gap-3"><label className="text-sm">Classe ou site de destination<select required className="input" value={transferStudent.destinationClassId || ''} onChange={(e) => setTransferStudent({ ...transferStudent, destinationClassId: e.target.value })}><option value="">Choisir</option>{classes.filter((c) => c.id !== classDetail.classInfo.id).map((c) => <option key={c.id} value={c.id}>{c.code_affichage}{c.site_nom ? ` �?" ${c.site_nom}` : ''}</option>)}</select></label><button className="primary self-end">Confirmer le transfert</button></form></Panel>}
+    {editingStudent && (
+  <Modal title={`Modifier la fiche de ${editingStudent.nom} ${editingStudent.prenom}`} onClose={() => setEditingStudent(null)}>
+    <form onSubmit={updateStudent} className="grid gap-3 sm:grid-cols-2">
+      <Input label="Nom" value={editingStudent.nom || ''} onChange={setEdit('nom')} required/>
+      <Input label="Prénom" value={editingStudent.prenom || ''} onChange={setEdit('prenom')} required/>
+      <Input label="Date de naissance" type="date" value={editingStudent.date_naissance || ''} onChange={setEdit('date_naissance')}/>
+      <Input label="Lieu de naissance" value={editingStudent.lieu_naissance || ''} onChange={setEdit('lieu_naissance')}/>
+      <Input label="Nationalité" value={editingStudent.nationalite || ''} onChange={setEdit('nationalite')}/>
+      <Input label="Téléphone parent/tuteur" value={editingStudent.telephone || ''} onChange={setEdit('telephone')}/>
+      <label className="text-sm">Sexe<select value={editingStudent.sexe || ''} onChange={setEdit('sexe')} className="input"><option value="">Non renseigné</option><option value="M">Masculin</option><option value="F">Féminin</option></select></label>
+      <button className="primary sm:col-span-2">Enregistrer les modifications</button>
+    </form>
+  </Modal>
+)}
+{transferStudent && (
+  <Modal title={`Transférer ${transferStudent.nom} ${transferStudent.prenom}`} onClose={() => setTransferStudent(null)}>
+    <form onSubmit={moveStudent} className="grid gap-3 sm:grid-cols-2">
+      <label className="text-sm sm:col-span-2">Classe ou site de destination
+        <select required className="input" value={transferStudent.destinationClassId || ''} onChange={(event) => setTransferStudent({ ...transferStudent, destinationClassId: event.target.value })}>
+          <option value="">Choisir</option>
+          {classes.filter((item) => item.id !== classDetail.classInfo.id).map((item) => <option key={item.id} value={item.id}>{item.code_affichage}{item.site_nom ? ` — ${item.site_nom}` : ''}</option>)}
+        </select>
+      </label>
+      <button className="primary sm:col-span-2">Confirmer le transfert</button>
+    </form>
+  </Modal>
+)}
     <Panel title="Liste des élèves">{students.length ? <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[980px] border-collapse text-left"><thead className="bg-slate-50"><tr className="border-b border-slate-200 text-xs font-semibold text-slate-500"><th className="px-4 py-4">Matricule</th><th className="px-4 py-4">Nom</th><th className="px-4 py-4">Prénom(s)</th><th className="px-4 py-4">Sexe</th><th className="px-4 py-4">Date et lieu de naissance</th><th className="px-4 py-4">Téléphone parent/tuteur</th><th className="px-4 py-4">Photo</th><th className="px-4 py-4 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{students.map((student) => <tr key={student.id} className="text-sm text-slate-700 hover:bg-slate-50/70"><td className="whitespace-nowrap px-4 py-5 font-medium text-slate-900">{value(student.matricule)}</td><td className="whitespace-nowrap px-4 py-5 font-semibold text-slate-900">{value(student.nom)}</td><td className="whitespace-nowrap px-4 py-5">{value(student.prenom)}</td><td className="px-4 py-5">{value(student.sexe)}</td><td className="whitespace-nowrap px-4 py-5">{value(student.date_naissance)}{student.lieu_naissance ? ` · ${student.lieu_naissance}` : ''}</td><td className="whitespace-nowrap px-4 py-5">{value(student.telephone)}</td><td className="px-4 py-5"><span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">OK</span></td><td className="px-4 py-5"><div className="flex justify-end gap-3">{editable && <><button type="button" title="Modifier" onClick={() => setEditingStudent({ ...student })} className="text-slate-400 transition hover:text-emerald-600"><Pencil className="h-4 w-4"/></button><button type="button" title="Transférer" onClick={() => setTransferStudent({ ...student, destinationClassId: '' })} className="text-xs font-medium text-slate-500 hover:text-slate-800">Transférer</button></>}</div></td></tr>)}</tbody></table></div> : <Empty>Aucun élève dans cette classe.</Empty>}</Panel>
   </>;
 }
 function ClassStudents({ editable, classes, classDetail, setClassDetail, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent }) {
   const students = classDetail.students || [];
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const visibleStudents = search.trim() ? students.filter((student) => matchStudentSearch(student, search)) : students;
+  const totalPages = Math.max(1, Math.ceil(visibleStudents.length / pageSize));
+  const pageStudents = visibleStudents.slice((page - 1) * pageSize, page * pageSize);
   const value = (item, fallback = 'Non renseigné') => item || fallback;
   const setEdit = (key) => (event) => setEditingStudent({ ...editingStudent, [key]: event.target.value });
+
+  useEffect(() => { setPage(1); }, [search]);
+
   return <>
     <button onClick={() => setClassDetail(null)} className="mb-4 flex gap-1 text-sm text-emerald-700"><ChevronLeft className="w-4"/>Retour aux classes</button>
     <Title title={classDetail.classInfo.code_affichage} subtitle={`${students.length} élève(s) affecté(s) à cette classe`}/>
-    {editingStudent && <Panel title={`Modifier la fiche de ${editingStudent.nom} ${editingStudent.prenom}`} action={<button onClick={() => setEditingStudent(null)} className="text-sm">Annuler</button>}><form onSubmit={updateStudent} className="grid gap-3 sm:grid-cols-2"><Input label="Nom" value={editingStudent.nom || ''} onChange={setEdit('nom')} required/><Input label="Prénom" value={editingStudent.prenom || ''} onChange={setEdit('prenom')} required/><Input label="Date de naissance" type="date" value={editingStudent.date_naissance || ''} onChange={setEdit('date_naissance')}/><Input label="Lieu de naissance" value={editingStudent.lieu_naissance || ''} onChange={setEdit('lieu_naissance')}/><Input label="Nationalité" value={editingStudent.nationalite || ''} onChange={setEdit('nationalite')}/><Input label="Téléphone parent/tuteur" value={editingStudent.telephone || ''} onChange={setEdit('telephone')}/><label className="text-sm">Sexe<select value={editingStudent.sexe || ''} onChange={setEdit('sexe')} className="input"><option value="">Non renseigné</option><option value="M">Masculin</option><option value="F">Féminin</option></select></label><button className="primary sm:col-span-2">Enregistrer les modifications</button></form></Panel>}
-    {transferStudent && <Panel title={`Transférer ${transferStudent.nom} ${transferStudent.prenom}`} action={<button onClick={() => setTransferStudent(null)} className="text-sm">Annuler</button>}><form onSubmit={moveStudent} className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Classe ou site de destination<select required className="input" value={transferStudent.destinationClassId || ''} onChange={(event) => setTransferStudent({ ...transferStudent, destinationClassId: event.target.value })}><option value="">Choisir</option>{classes.filter((item) => item.id !== classDetail.classInfo.id).map((item) => <option key={item.id} value={item.id}>{item.code_affichage}{item.site_nom ? ` — ${item.site_nom}` : ''}</option>)}</select></label><button className="primary self-end">Confirmer le transfert</button></form></Panel>}
-    <div className="mb-4 flex items-center gap-3"><div className="relative"><Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"/><input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un élève (matricule, nom, téléphone...)" className="w-72 pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div></div>
-    <Panel title="Liste des élèves">{visibleStudents.length ? <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[1040px] border-collapse text-left text-xs"><thead className="bg-slate-50"><tr className="border-b border-slate-200 font-semibold text-slate-500"><th className="whitespace-nowrap px-3 py-2">Matricule</th><th className="whitespace-nowrap px-3 py-2">Nom</th><th className="whitespace-nowrap px-3 py-2">Prénom(s)</th><th className="whitespace-nowrap px-3 py-2">Sexe</th><th className="whitespace-nowrap px-3 py-2">Naissance</th><th className="whitespace-nowrap px-3 py-2">Nationalité</th><th className="whitespace-nowrap px-3 py-2">Téléphone parent/tuteur</th><th className="whitespace-nowrap px-3 py-2 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleStudents.map((student) => <tr key={student.id} className="whitespace-nowrap text-slate-700 hover:bg-slate-50/70"><td className="px-3 py-2 font-medium text-slate-900">{value(student.matricule)}</td><td className="px-3 py-2 font-semibold text-slate-900">{value(student.nom)}</td><td className="px-3 py-2">{value(student.prenom)}</td><td className="px-3 py-2">{value(student.sexe)}</td><td className="px-3 py-2">{value(student.date_naissance)}{student.lieu_naissance ? ` · ${student.lieu_naissance}` : ''}</td><td className="px-3 py-2">{value(student.nationalite)}</td><td className="px-3 py-2">{value(student.telephone)}</td><td className="px-3 py-2"><div className="flex justify-end gap-3">{editable && <><button type="button" title="Modifier" onClick={() => setEditingStudent({ ...student })} className="text-slate-400 transition hover:text-emerald-600"><Pencil className="h-4 w-4"/></button><button type="button" title="Transférer" onClick={() => setTransferStudent({ ...student, destinationClassId: '' })} className="text-xs font-medium text-slate-500 hover:text-slate-800">Transférer</button></>}</div></td></tr>)}</tbody></table></div> : <Empty>{search.trim() ? 'Aucun élève ne correspond à la recherche.' : 'Aucun élève dans cette classe.'}</Empty>}</Panel>
+
+    {editingStudent && (
+      <Modal title={`Modifier la fiche de ${editingStudent.nom} ${editingStudent.prenom}`} onClose={() => setEditingStudent(null)}>
+        <form onSubmit={updateStudent} className="grid gap-3 sm:grid-cols-2">
+          <Input label="Nom" value={editingStudent.nom || ''} onChange={setEdit('nom')} required/>
+          <Input label="Prénom" value={editingStudent.prenom || ''} onChange={setEdit('prenom')} required/>
+          <Input label="Date de naissance" type="date" value={editingStudent.date_naissance || ''} onChange={setEdit('date_naissance')}/>
+          <Input label="Lieu de naissance" value={editingStudent.lieu_naissance || ''} onChange={setEdit('lieu_naissance')}/>
+          <Input label="Nationalité" value={editingStudent.nationalite || ''} onChange={setEdit('nationalite')}/>
+          <Input label="Téléphone parent/tuteur" value={editingStudent.telephone || ''} onChange={setEdit('telephone')}/>
+          <label className="text-sm">Sexe<select value={editingStudent.sexe || ''} onChange={setEdit('sexe')} className="input"><option value="">Non renseigné</option><option value="M">Masculin</option><option value="F">Féminin</option></select></label>
+          <button className="primary sm:col-span-2">Enregistrer les modifications</button>
+        </form>
+      </Modal>
+    )}
+
+    {transferStudent && (
+      <Modal title={`Transférer ${transferStudent.nom} ${transferStudent.prenom}`} onClose={() => setTransferStudent(null)}>
+        <form onSubmit={moveStudent} className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm sm:col-span-2">Classe ou site de destination
+            <select required className="input" value={transferStudent.destinationClassId || ''} onChange={(event) => setTransferStudent({ ...transferStudent, destinationClassId: event.target.value })}>
+              <option value="">Choisir</option>
+              {classes.filter((item) => item.id !== classDetail.classInfo.id).map((item) => <option key={item.id} value={item.id}>{item.code_affichage}{item.site_nom ? ` — ${item.site_nom}` : ''}</option>)}
+            </select>
+          </label>
+          <button className="primary sm:col-span-2">Confirmer le transfert</button>
+        </form>
+      </Modal>
+    )}
+
+    <div className="mb-4 flex items-center gap-3">
+      <div className="relative">
+        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"/>
+        <input type="text" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un élève (matricule, nom, téléphone...)" className="w-72 pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+      </div>
+    </div>
+
+    <Panel title="Liste des élèves">
+      {pageStudents.length ? (
+        <>
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full table-fixed border-collapse text-left text-xs">
+              <colgroup>
+                <col className="w-[12%]" /><col className="w-[14%]" /><col className="w-[16%]" /><col className="w-[8%]" /><col className="w-[16%]" /><col className="w-[12%]" /><col className="w-[14%]" /><col className="w-[8%]" />
+              </colgroup>
+              <thead className="bg-slate-50">
+                <tr className="border-b border-slate-200 font-semibold text-slate-500">
+                  <th className="px-3 py-2">Matricule</th>
+                  <th className="px-3 py-2">Nom</th>
+                  <th className="px-3 py-2">Prénom(s)</th>
+                  <th className="px-3 py-2">Sexe</th>
+                  <th className="px-3 py-2">Naissance</th>
+                  <th className="px-3 py-2">Nationalité</th>
+                  <th className="px-3 py-2">Téléphone</th>
+                  <th className="px-3 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {pageStudents.map((student) => (
+                  <tr key={student.id} className="text-slate-700 hover:bg-slate-50/70">
+                    <td className="truncate px-3 py-2 font-medium text-slate-900">{value(student.matricule)}</td>
+                    <td className="truncate px-3 py-2 font-semibold text-slate-900">{value(student.nom)}</td>
+                    <td className="truncate px-3 py-2">{value(student.prenom)}</td>
+                    <td className="px-3 py-2">{value(student.sexe)}</td>
+                    <td className="truncate px-3 py-2">{value(student.date_naissance)}{student.lieu_naissance ? ` · ${student.lieu_naissance}` : ''}</td>
+                    <td className="truncate px-3 py-2">{value(student.nationalite)}</td>
+                    <td className="truncate px-3 py-2">{value(student.telephone)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex justify-end gap-3">
+                        {editable && <>
+                          <button type="button" title="Modifier" onClick={() => setEditingStudent({ ...student })} className="text-slate-400 transition hover:text-emerald-600"><Pencil className="h-4 w-4"/></button>
+                          <button type="button" title="Transférer" onClick={() => setTransferStudent({ ...student, destinationClassId: '' })} className="text-xs font-medium text-slate-500 hover:text-slate-800">Transférer</button>
+                        </>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+            <span>Page {page} sur {totalPages}</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                <ChevronLeft className="h-3.5 w-3.5" />Précédent
+              </button>
+              <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                Suivant<ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </>
+      ) : <Empty>{search.trim() ? 'Aucun élève ne correspond à la recherche.' : 'Aucun élève dans cette classe.'}</Empty>}
+    </Panel>
   </>;
 }
 function Accountant({ cash, paymentOptions = [], createPayment, setSection }) {
