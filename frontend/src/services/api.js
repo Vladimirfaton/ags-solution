@@ -112,6 +112,10 @@ export const comptabiliteAPI = {
   createPayment: (data) => api.post('/comptabilite/paiements', data),
   financialConfiguration: () => api.get('/comptabilite/finances'),
   saveFinancialConfiguration: (data) => api.put('/comptabilite/finances', data),
+  paymentStatus: (params = {}) => api.get('/comptabilite/paiements/statut', { params }),
+  exportPaymentStatus: (params = {}) => api.get('/comptabilite/paiements/statut/export', { params, responseType: 'blob' }),
+  paymentHistory: (search = '', page = 1) => api.get('/comptabilite/paiements/historique', { params: { recherche: search, page, pageSize: 10 } }),
+  getPaymentReceipt: (id) => api.get(`/comptabilite/paiements/${id}/recu`),
 };
 
 export const censeurAPI = {

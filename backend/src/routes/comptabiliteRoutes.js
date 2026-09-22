@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { createEnrollment, createPayment, getCashOverview, getEnrollmentOptions, getPaymentOptions } from '../controllers/comptabiliteController.js';
+import { createEnrollment, createPayment, exportPaymentStatus, getCashOverview, getEnrollmentOptions, getPaymentHistory,getPaymentReceipt, getPaymentOptions, getPaymentStatus } from '../controllers/comptabiliteController.js';
 import { getFinancialConfiguration, saveFinancialConfiguration } from '../controllers/directionController.js';
 import { confirmStudentImport, previewStudentImport } from '../controllers/studentImportController.js';
 import { authenticate, authorizePermission } from '../middleware/auth.js';
@@ -29,3 +29,7 @@ router.post('/paiements', authorizePermission('caisse.gerer'), createPayment);
 router.get('/finances', authorizePermission('frais.gerer'), getFinancialConfiguration);
 router.put('/finances', authorizePermission('frais.gerer'), saveFinancialConfiguration);
 export default router;
+router.get('/paiements/statut', authorizePermission('caisse.gerer'), getPaymentStatus);
+router.get('/paiements/statut/export', authorizePermission('caisse.gerer'), exportPaymentStatus);
+router.get('/paiements/historique', authorizePermission('caisse.gerer'), getPaymentHistory);
+router.get('/paiements/:id/recu', authorizePermission('caisse.gerer'), getPaymentReceipt);

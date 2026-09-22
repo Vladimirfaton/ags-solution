@@ -105,4 +105,67 @@ export class Payment {
       throw error;
     } finally { client.release(); }
   }
+    static async list(scope, { search = '', page = 1, pageSize = 10 } = {}) {
+    const siteFilter = scope.allSites ? '' : ` AND i.site_id = ANY($${search.trim() ? 2 : 1}::uuid[])`;
+    const searchFilter = search.trim() ? ' AND (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)' : '';
+    const params = [];
+    if (search.trim()) params.push(`%${search.trim()}%`);
+    if (!scope.allSites) params.push(scope.siteIds);
+    const offset = (Math.max(1, page) - 1) * pageSize;
+
+    const [rows, count] = await Promise.all([
+      query(`SELECT p.id, p.numero_recu, p.mode_paiement, p.montant_encaisse, p.created_at,
+          e.matricule, e.nom, e.prenom, ca.code_affichage
+        FROM paiements p
+        JOIN inscriptions i ON i.id = p.inscription_id
+        JOIN eleves e ON e.id = i.eleve_id
+        JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+        JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+        WHERE p.statut = 'confirme'${searchFilter}${siteFilter}
+        ORDER BY p.created_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, pageSize, offset]),
+      query(`SELECT COUNT(*)::int AS total
+        FROM paiements p
+        JOIN inscriptions i ON i.id = p.inscription_id
+        JOIN eleves e ON e.id = i.eleve_id
+        JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+        JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+        WHERE p.statut = 'confirme'${searchFilter}${siteFilter}`, params),
+    ]);
+
+    return {
+      payments: rows.rows.map((row) => ({
+        id: row.id, numeroRecu: row.numero_recu, mode: row.mode_paiement, montant: Number(row.montant_encaisse),
+        date: row.created_at, matricule: row.matricule, nom: row.nom, prenom: row.prenom, classe: row.code_affichage,
+      })),
+      total: count.rows[0].total, page, pageSize,
+    };
+  }
+  static async getReceiptData(paymentId, scope) {
+  const scopeFilter = scope.allSites ? '' : ' AND i.site_id = ANY($2::uuid[])';
+  const result = await query(`SELECT p.id, p.numero_recu, p.mode_paiement, p.montant_remis, p.montant_encaisse,
+      p.monnaie_rendue, p.reference_paiement, p.created_at,
+      e.nom, e.prenom, e.matricule, ca.code_affichage
+    FROM paiements p
+    JOIN inscriptions i ON i.id = p.inscription_id
+    JOIN eleves e ON e.id = i.eleve_id
+    JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+    JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+    WHERE p.id = $1 AND p.statut = 'confirme'${scopeFilter}`,
+    scope.allSites ? [paymentId] : [paymentId, scope.siteIds]);
+  if (!result.rowCount) fail('Reçu introuvable.', 404);
+  const payment = result.rows[0];
+
+  const allocations = await query(`SELECT o.libelle, ap.montant_affecte AS montant
+    FROM affectations_paiement ap
+    JOIN obligations_financieres o ON o.id = ap.obligation_financiere_id
+    WHERE ap.paiement_id = $1
+    ORDER BY o.ordre`, [paymentId]);
+
+  return {
+    payment: { numero_recu: payment.numero_recu, mode_paiement: payment.mode_paiement, montant_remis: payment.montant_remis, montant_encaisse: payment.montant_encaisse, monnaie_rendue: payment.monnaie_rendue, reference_paiement: payment.reference_paiement, created_at: payment.created_at },
+    student: { nom: payment.nom, prenom: payment.prenom, matricule: payment.matricule, code_affichage: payment.code_affichage },
+    allocations: allocations.rows.map((row) => ({ libelle: row.libelle, montant: Number(row.montant) })),
+  };
+}
 }

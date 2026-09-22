@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Banknote, Building2, CalendarDays, ChevronLeft, ChevronRight, IdCard, KeyRound, LayoutDashboard, LogOut, MapPin, Pencil, Plus, Save, School, Search, UserPlus, UserRound, Users } from 'lucide-react';
+import { Banknote, Building2, BookOpen, CalendarDays, ChevronLeft, ChevronRight, IdCard, History, KeyRound, LayoutDashboard, LifeBuoy, LogOut, MapPin, Pencil, ShieldCheck, UserRound, Users, UsersRound, Plus, Save, School, Search, UserPlus } from 'lucide-react';
 import { authAPI, censeurAPI, comptabiliteAPI, directionAPI, platformAPI, secretariatAPI } from '../services/api';
 import { PLATFORM_NAME } from '../config/branding';
 import { generatePaymentReceiptPDF } from '../utils/paymentReceipt';
@@ -10,6 +10,7 @@ import ManagementWorkspace from './ManagementWorkspace';
 import CenseurPedagogy from './CenseurPedagogy';
 import StudentImportPanel from './StudentImportPanel';
 import AssistancePanel from './AssistancePanel';
+import FinanceOverview, { HistoryPanel } from './FinanceOverview';
 
 const labels = { directeur: 'Directeur', secretaire: 'Secrétaire', comptable: 'Comptable', censeur: 'Censeur' };
 const money = (value) => `${Number(value || 0).toLocaleString('fr-FR')} F CFA`;
@@ -20,6 +21,7 @@ const classLevelCode = (value = '') => { const normalized = value.trim().toLower
 
 export default function ManagementDashboard({ onLogout }) {
   const [user, setUser] = useState(null); const [section, setSection] = useState('tableau'); const [loading, setLoading] = useState(true);
+  const [financeRefreshKey, setFinanceRefreshKey] = useState(0);
   const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [profileEdit, setProfileEdit] = useState(false);
   const [profile, setProfile] = useState({ nom: '', prenom: '', email: '', telephone: '' }); const [password, setPassword] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [direction, setDirection] = useState(null); const [establishmentName, setEstablishmentName] = useState(''); const [secretaryClasses, setSecretaryClasses] = useState([]); const [censeurClasses, setCenseurClasses] = useState([]); const [classDetail, setClassDetail] = useState(null);
@@ -58,9 +60,17 @@ const saveProfile = (event, newUsername) => { event.preventDefault(); action(asy
   const updateStudent = (event) => { event.preventDefault(); action(() => secretariatAPI.updateStudent(editingStudent.id, editingStudent), 'Informations de l’élève mises à jour.', async () => { const id = classDetail.classInfo.id; setEditingStudent(null); await loadClass(id); }); };
   const moveStudent = (event) => { event.preventDefault(); action(() => secretariatAPI.transferStudent(transferStudent.id, transferStudent.destinationClassId), 'Transfert interne enregistré.', async () => { const id = classDetail.classInfo.id; setTransferStudent(null); await loadClass(id); }); };
   const createEnrollment = (event) => { event.preventDefault(); const payload = enrollForm.type === 'reinscription' ? { type: 'reinscription', studentId: enrollForm.studentId, annualClassId: enrollForm.annualClassId } : { ...enrollForm }; action(() => comptabiliteAPI.createEnrollment(payload), 'Inscription enregistrée. Les effectifs sont actualisés immédiatement.', async () => setEnrollForm({ type: 'inscription', studentId: '', annualClassId: '', ...blankStudent })); };
-  const createPayment = async (payload) => { setError(''); setNotice(''); try { const { data } = await comptabiliteAPI.createPayment(payload); await generatePaymentReceiptPDF(data); await refresh(user.role); setNotice('Paiement enregistré. Le reçu interne a été téléchargé.'); } catch (err) { setError(err.response?.data?.error || 'Paiement impossible.'); } };
+const createPayment = async (payload, studentLabel) => {
+  setError(''); setNotice('');
+  try {
+    await comptabiliteAPI.createPayment(payload);
+    setNotice(`Paiement enregistré pour ${studentLabel || "l'élève sélectionné"}.`);
+    await refresh(user.role);
+    setFinanceRefreshKey((k) => k + 1);
+  } catch (err) { setError(err.response?.data?.error || 'Paiement impossible.'); }
+};
   if (loading) return <main className="min-h-screen grid place-items-center bg-slate-50 text-slate-500">Chargement...</main>;
-  const content = section === 'profil' ? <Profile profile={profile} setProfile={setProfile} edit={profileEdit} setEdit={setProfileEdit} save={saveProfile} username={user.username}/> : section === 'securite' ? <Security password={password} setPassword={setPassword} save={savePassword}/> : <RoleContent {...{ role: user.role, section, setSection, direction, establishmentName, finance, saveFinancialConfiguration, secretaryClasses, censeurClasses, classDetail, loadClass, setClassDetail, classForm, setClassForm, createClass, yearForm, setYearForm, createYear, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent, cash, enrollOptions, enrollForm, setEnrollForm, createEnrollment, paymentOptions, createPayment, monitoring }}/>;
+  const content = section === 'profil' ? <Profile profile={profile} setProfile={setProfile} edit={profileEdit} setEdit={setProfileEdit} save={saveProfile} username={user.username}/> : section === 'securite' ? <Security password={password} setPassword={setPassword} save={savePassword}/> : <RoleContent {...{ role: user.role, section, setSection, direction, establishmentName, finance, saveFinancialConfiguration, secretaryClasses, censeurClasses, classDetail, loadClass, setClassDetail, classForm, setClassForm, createClass, yearForm, setYearForm, createYear, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent, cash, enrollOptions, enrollForm, setEnrollForm, createEnrollment, paymentOptions, createPayment, monitoring}}/>;
   if (user.role === 'directeur') return <DirectorWorkspace user={user} establishmentName={establishmentName} onLogout={onLogout} section={section} setSection={setSection} content={content} error={error} notice={notice} cockpitProps={{ direction, yearForm, setYearForm, createYear }} />;
   return <ManagementWorkspace role={user.role} user={user} establishmentName={establishmentName} section={section} setSection={setSection} onLogout={onLogout} content={content} error={error} notice={notice} />;
   return <div className="min-h-screen bg-[#f7faf8] flex"><aside className="hidden md:flex w-64 shrink-0 bg-white border-r border-slate-200 p-5 flex-col sticky top-0 h-screen"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center"><IdCard className="w-5 h-5 text-white"/></div><div><h1 className="text-lg font-semibold text-slate-800 leading-tight">{PLATFORM_NAME}</h1><p className="text-xs text-slate-500">Espace {labels[user.role]}</p></div></div><nav className="mt-9 space-y-1">{menu(user.role).map((item) => <button key={item.id} onClick={() => { setSection(item.id); setClassDetail(null); }} className={`w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition ${section === item.id ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>{item.icon}{item.label}</button>)}</nav><button onClick={onLogout} className="mt-auto flex items-center gap-3 px-3 py-3 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition"><LogOut className="w-4"/>Déconnexion</button></aside><div className="flex-1 min-w-0"><header className="sticky top-0 z-30 bg-white border-b border-slate-200"><div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="w-8 h-8 shrink-0 rounded-lg bg-emerald-600 flex items-center justify-center"><IdCard className="w-4 h-4 text-white"/></div><div className="min-w-0"><h1 className="truncate text-sm font-semibold text-slate-800">{PLATFORM_NAME} · {labels[user.role]}</h1><p className="truncate text-xs text-slate-500">{user.prenom} {user.nom}</p></div></div><div className="flex shrink-0 items-center gap-2"><span className="hidden text-xs text-slate-500 sm:inline">{section === 'tableau' ? 'Tableau de bord' : menu(user.role).find((item) => item.id === section)?.label}</span><button onClick={onLogout} title="Déconnexion" aria-label="Déconnexion" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><LogOut className="w-4"/></button></div></div></header><main className="max-w-7xl mx-auto px-3 py-5 sm:px-6 sm:py-7">{!user.passwordPersonalized && <Notice>Mot de passe initial encore actif : personnalisez-le dans « Sécurité ».</Notice>}{error && <Notice type="error">{error}</Notice>}{notice && <Notice type="success">{notice}</Notice>}<section>{content}</section></main></div></div>;
@@ -68,43 +78,91 @@ const saveProfile = (event, newUsername) => { event.preventDefault(); action(asy
 
 function menu(role) { const dashboard = { id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="w-4"/> }; const profile = { id: 'profil', label: 'Informations personnelles', icon: <UserRound className="w-4"/> }; const security = { id: 'securite', label: 'Sécurité', icon: <KeyRound className="w-4"/> }; const items = { directeur: [], secretaire: [{ id: 'classes', label: 'Classes et élèves', icon: <School className="w-4"/> }], comptable: [{ id: 'inscriptions', label: 'Inscriptions', icon: <UserPlus className="w-4"/> }, { id: 'finances', label: 'Frais et tarifs', icon: <Banknote className="w-4"/> }, { id: 'caisse', label: 'Caisse', icon: <Banknote className="w-4"/> }], censeur: [{ id: 'classes', label: 'Classes et élèves', icon: <Users className="w-4"/> }] }; return [dashboard, ...(items[role] || []), profile, security]; }
 function RoleIdentity({ role }) { const identity = { directeur: { title: 'Direction', subtitle: 'Pilotez l’établissement, les années scolaires et les effectifs.', classes: 'bg-emerald-50 border-emerald-200 text-emerald-700' }, secretaire: { title: 'Secrétariat', subtitle: 'Organisez les classes, les élèves et les dossiers scolaires.', classes: 'bg-sky-50 border-sky-200 text-sky-700' }, comptable: { title: 'Comptabilité', subtitle: 'Suivez les inscriptions, les frais et les encaissements.', classes: 'bg-amber-50 border-amber-200 text-amber-700' }, censeur: { title: 'Censeur', subtitle: 'Consultez les classes et surveillez les mouvements d’élèves.', classes: 'bg-violet-50 border-violet-200 text-violet-700' } }[role] || { title: 'Espace de gestion', subtitle: 'Accès aux opérations autorisées pour votre compte.', classes: 'bg-slate-50 border-slate-200 text-slate-700' }; return <div className={`mb-6 rounded-2xl border p-5 ${identity.classes}`}><p className="text-xs font-semibold uppercase tracking-[0.16em]">Espace {identity.title}</p><p className="mt-2 text-sm text-slate-600">{identity.subtitle}</p></div>; }
-function RoleContent(props) { if (props.role === 'directeur') return props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <DirectorCockpit {...props}/>; const view = props.role === 'secretaire' ? (props.section === 'classes' ? <ClassRegistry {...props} editable/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <SecretaryHome {...props}/>) : props.role === 'comptable' ? (props.section === 'inscriptions' ? <><Enroll {...props}/><StudentImportPanel/></> : props.section === 'finances' ? <FinanceSettings {...props}/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <Accountant {...props}/>) : props.role === 'censeur' ? (props.section === 'classes' ? <ClassRegistry {...props}/> : props.section === 'pedagogie' ? <CenseurPedagogy/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <Monitoring {...props}/>) : null; return <><RoleIdentity role={props.role}/>{view}</>; }
+function RoleContent(props) { if (props.role === 'directeur') return props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <DirectorCockpit {...props}/>; const view = props.role === 'secretaire' ? (props.section === 'classes' ? <ClassRegistry {...props} editable/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <SecretaryHome {...props}/>) : props.role === 'comptable' ? (
+  props.section === 'inscriptions' ? <><Enroll {...props}/><StudentImportPanel/></>
+  : props.section === 'finances' ? <FinanceSettings {...props}/>
+  : props.section === 'caisse' ? <Accountant {...props}/>
+  : props.section === 'historique' ? <HistoryPanel key={props.financeRefreshKey} />
+  : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/>
+  : <FinanceOverview key={props.financeRefreshKey} />
+) : props.role === 'censeur' ? (props.section === 'classes' ? <ClassRegistry {...props}/> : props.section === 'pedagogie' ? <CenseurPedagogy/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <Monitoring {...props}/>) : null; return <><RoleIdentity role={props.role}/>{view}</>; }
 function DirectorHome({ direction, yearForm, setYearForm, createYear, classDetail, setClassDetail, loadClass }) { const set = (key) => (e) => setYearForm({ ...yearForm, [key]: e.target.value }); const totalClasses = direction?.classes?.length || 0; const totalStudents = direction?.sites?.reduce((sum, site) => sum + Number(site.students_count || 0), 0) || 0; if (classDetail?.classInfo) return <ClassStudents editable={false} classes={direction?.classes || []} classDetail={classDetail} setClassDetail={setClassDetail}/>; return <><Title title="Tableau de bord" subtitle="Pilotage général de l�?Tétablissement"/><div className="grid grid-cols-2 lg:grid-cols-4 gap-4"><Card icon={<Building2/>} label="�?tablissement" value={direction?.etablissement?.nom || '�?"'}/><Card icon={<CalendarDays/>} label="Année active" value={direction?.anneeActive?.libelle || '�? configurer'}/><Card icon={<School/>} label="Classes actives" value={totalClasses}/><Card icon={<Users/>} label="�?lèves inscrits" value={totalStudents}/></div>{!direction?.anneeActive && <Panel title="Lancer la première année scolaire"><form onSubmit={createYear} className="grid sm:grid-cols-3 gap-3"><Input label="Année scolaire" placeholder="2026-2027" value={yearForm.libelle} onChange={set('libelle')} required/><Input label="Début" type="date" value={yearForm.dateDebut} onChange={set('dateDebut')} required/><Input label="Fin" type="date" value={yearForm.dateFin} onChange={set('dateFin')} required/><button className="sm:col-span-3 primary">Activer l�?Tannée scolaire</button></form></Panel>}<Panel title="Classes de l�?Tétablissement"><div className="grid sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">{direction?.classes?.length ? sortClasses(direction.classes).map((item) => <button key={item.id} onClick={() => loadClass(item.id)} className="text-left border border-slate-200 rounded-xl p-3 hover:border-emerald-500 hover:bg-emerald-50/30 transition"><p className="font-semibold text-slate-800 text-sm">{item.code_affichage}</p><p className="text-xs text-slate-500 mt-2">{item.effectif} élève(s)</p><p className="text-xs text-slate-400 mt-1 truncate">{item.site_nom}</p></button>) : <Empty>Aucune classe pour l�?Tannée active.</Empty>}</div></Panel></>; }
 function Sites({ direction, siteForm, setSiteForm, createSite }) { const set = (key) => (event) => setSiteForm({ ...siteForm, [key]: event.target.value }); return <><Title title="Sites et filiales" subtitle="Le site principal est créé à l�?Tinstallation. Ajoutez une filiale seulement si elle partage le même établissement."/><div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">{direction?.sites?.map((site) => <Card key={site.id} icon={<MapPin/>} label={site.est_principal ? 'Site principal' : 'Filiale'} value={site.nom}><p className="text-xs text-slate-500 mt-3">{site.classes_count} classe(s) · {site.students_count} élève(s)</p></Card>)}</div><Panel title="Ajouter un site"><form onSubmit={createSite} className="grid sm:grid-cols-2 gap-3"><Input label="Nom du site" value={siteForm.nom} onChange={set('nom')} required/><Input label="Téléphone" value={siteForm.telephone} onChange={set('telephone')}/><Input label="Adresse" value={siteForm.adresse} onChange={set('adresse')}/><Input label="Commune" value={siteForm.commune} onChange={set('commune')}/><Input label="Département" value={siteForm.departement} onChange={set('departement')}/><Input label="Email" type="email" value={siteForm.email} onChange={set('email')}/><button className="sm:col-span-2 primary flex items-center justify-center gap-2"><Plus className="w-4"/>Créer le site</button></form></Panel></>; }
 function FinanceSettings({ finance, saveFinancialConfiguration }) {
   const [draft, setDraft] = useState({ fees: [], plans: [] });
+  const [mode, setMode] = useState('view');
+
   useEffect(() => {
     if (!finance) return;
-    setDraft({
-      fees: finance.fees.map((fee) => ({ ...fee, applicableA: fee.applicable_a, montant: String(fee.montant) })),
-      plans: finance.classes.map((annualClass) => ({ classeAnnuelleId: annualClass.id, label: annualClass.code_affichage, montantTotal: annualClass.plan ? String(annualClass.plan.montant_total) : '', tranches: annualClass.plan?.tranches?.map((tranche) => ({ ...tranche, montant: String(tranche.montant), dateEcheance: tranche.date_echeance?.slice(0, 10) || '', })) || [], })),
-    });
+    const fees = finance.fees.map((fee) => ({ ...fee, applicableA: fee.applicable_a, montant: String(fee.montant) }));
+    const plans = finance.classes.map((annualClass) => ({
+      classeAnnuelleId: annualClass.id,
+      label: annualClass.code_affichage,
+      montantTotal: annualClass.plan ? String(annualClass.plan.montant_total) : '',
+      tranches: annualClass.plan?.tranches?.map((tranche) => ({ ...tranche, montant: String(tranche.montant), dateEcheance: tranche.date_echeance?.slice(0, 10) || '' })) || [],
+    }));
+    setDraft({ fees, plans });
+    setMode(fees.length > 0 || plans.some((p) => p.montantTotal) ? 'view' : 'edit');
   }, [finance]);
+
   const setFee = (index, key, value) => setDraft({ ...draft, fees: draft.fees.map((fee, current) => current === index ? { ...fee, [key]: value } : fee) });
   const setPlan = (index, key, value) => setDraft({ ...draft, plans: draft.plans.map((plan, current) => current === index ? { ...plan, [key]: value } : plan) });
   const setTranche = (planIndex, trancheIndex, key, value) => setDraft({ ...draft, plans: draft.plans.map((plan, current) => current !== planIndex ? plan : { ...plan, tranches: plan.tranches.map((tranche, trancheCurrent) => trancheCurrent === trancheIndex ? { ...tranche, [key]: value } : tranche) }) });
   const addFee = () => setDraft({ ...draft, fees: [...draft.fees, { nom: '', montant: '', applicableA: 'les_deux', obligatoire: true, ordre: draft.fees.length, actif: true }] });
   const addTranche = (planIndex) => setDraft({ ...draft, plans: draft.plans.map((plan, current) => current !== planIndex ? plan : { ...plan, tranches: [...plan.tranches, { nom: `Tranche ${plan.tranches.length + 1}`, montant: '', dateEcheance: '', ordre: plan.tranches.length + 1, actif: true }] }) });
-  const submit = (event) => { event.preventDefault(); saveFinancialConfiguration({ fees: draft.fees, plans: draft.plans }); };
   const trancheSum = (plan) => plan.tranches.reduce((sum, t) => sum + Number(t.montant || 0), 0);
-const levelOf = (label) => label.split('—')[0].trim();
+  const levelOf = (label) => label.split('-')[0].trim();
+  const applyToLevel = (planIndex) => {
+    const source = draft.plans[planIndex];
+    const level = levelOf(source.label);
+    setDraft({ ...draft, plans: draft.plans.map((plan) => plan === source || levelOf(plan.label) !== level ? plan : { ...plan, montantTotal: source.montantTotal, tranches: source.tranches.map(({ id, ...rest }) => ({ ...rest })) }) });
+  };
 
-const applyToLevel = (planIndex) => {
-  const source = draft.plans[planIndex];
-  const level = levelOf(source.label);
-  setDraft({
-    ...draft,
-    plans: draft.plans.map((plan) => {
-      if (plan === source || levelOf(plan.label) !== level) return plan;
-      return {
-        ...plan,
-        montantTotal: source.montantTotal,
-        tranches: source.tranches.map(({ id, ...rest }) => ({ ...rest })),
-      };
-    }),
-  });
-};
+  const submit = (event) => { event.preventDefault(); saveFinancialConfiguration({ fees: draft.fees, plans: draft.plans }); setMode('view'); };
+
   if (!finance?.year) return <><Title title="Paramètres financiers" subtitle="Configurez les frais et tarifs de l'année active"/><Empty>Activez d'abord une année scolaire.</Empty></>;
+
+  if (mode === 'view') {
+    return (
+      <>
+        <Title title="Paramètres financiers" subtitle={`Année ${finance.year.libelle} · ${finance.site.nom}`}/>
+        <Panel title="Frais généraux" action={<button type="button" onClick={() => setMode('edit')} className="flex items-center gap-1 text-sm font-semibold text-emerald-700"><Pencil className="h-3.5 w-3.5" />Modifier</button>}>
+          {draft.fees.length ? (
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="grid grid-cols-12 gap-3 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500">
+                <span className="col-span-4">Libellé</span><span className="col-span-3">Montant</span><span className="col-span-3">Applicable à</span><span className="col-span-2">Obligatoire</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {draft.fees.map((fee, index) => (
+                  <div key={fee.id || index} className="grid grid-cols-12 items-center gap-3 px-4 py-3 text-sm">
+                    <span className="col-span-4 font-medium text-slate-800">{fee.nom}</span>
+                    <span className="col-span-3">{money(fee.montant)}</span>
+                    <span className="col-span-3 text-slate-500">{fee.applicableA === 'les_deux' ? 'Inscription et réinscription' : fee.applicableA === 'inscription' ? 'Inscription seulement' : 'Réinscription seulement'}</span>
+                    <span className="col-span-2">{fee.obligatoire ? 'Oui' : 'Non'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : <Empty>Aucun frais général configuré.</Empty>}
+        </Panel>
+        <Panel title="Tarifs par classe">
+          {draft.plans.some((p) => p.montantTotal) ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {draft.plans.filter((p) => p.montantTotal).map((plan) => (
+                <div key={plan.classeAnnuelleId} className="rounded-xl border border-slate-200 p-4">
+                  <h4 className="font-semibold text-slate-800">{plan.label}</h4>
+                  <p className="mt-1 text-sm text-slate-600">Tarif annuel : {money(plan.montantTotal)}</p>
+                  <ul className="mt-3 space-y-1 text-xs text-slate-500">
+                    {plan.tranches.map((t, i) => <li key={t.id || i}>{t.nom} — {money(t.montant)} · Échéance {t.dateEcheance}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : <Empty>Aucun tarif configuré.</Empty>}
+        </Panel>
+      </>
+    );
+  }
 
   return (
     <>
@@ -114,10 +172,7 @@ const applyToLevel = (planIndex) => {
           {draft.fees.length ? (
             <div className="overflow-hidden rounded-xl border border-slate-200">
               <div className="grid grid-cols-12 gap-3 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500">
-                <span className="col-span-4">Libellé</span>
-                <span className="col-span-3">Montant (F CFA)</span>
-                <span className="col-span-3">Applicable à</span>
-                <span className="col-span-2">Obligatoire</span>
+                <span className="col-span-4">Libellé</span><span className="col-span-3">Montant (F CFA)</span><span className="col-span-3">Applicable à</span><span className="col-span-2">Obligatoire</span>
               </div>
               <div className="divide-y divide-slate-100">
                 {draft.fees.map((fee, index) => (
@@ -125,13 +180,9 @@ const applyToLevel = (planIndex) => {
                     <input className="input col-span-4" value={fee.nom} onChange={(event) => setFee(index, 'nom', event.target.value)} required placeholder="Ex : Inscription"/>
                     <input className="input col-span-3" type="number" min="0" step="0.01" value={fee.montant} onChange={(event) => setFee(index, 'montant', event.target.value)} required/>
                     <select className="input col-span-3" value={fee.applicableA} onChange={(event) => setFee(index, 'applicableA', event.target.value)}>
-                      <option value="les_deux">Inscription et réinscription</option>
-                      <option value="inscription">Inscription seulement</option>
-                      <option value="reinscription">Réinscription seulement</option>
+                      <option value="les_deux">Inscription et réinscription</option><option value="inscription">Inscription seulement</option><option value="reinscription">Réinscription seulement</option>
                     </select>
-                    <label className="col-span-2 flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={fee.obligatoire} onChange={(event) => setFee(index, 'obligatoire', event.target.checked)}/> Oui
-                    </label>
+                    <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={fee.obligatoire} onChange={(event) => setFee(index, 'obligatoire', event.target.checked)}/> Oui</label>
                   </div>
                 ))}
               </div>
@@ -144,31 +195,18 @@ const applyToLevel = (planIndex) => {
             <div className="grid gap-4 lg:grid-cols-2">
               {draft.plans.map((plan, planIndex) => {
                 const sum = trancheSum(plan);
-                const total = Number(plan.montantTotal || 0);
-                const balanced = plan.tranches.length > 0 && sum === total;
+                const totalPlan = Number(plan.montantTotal || 0);
+                const balanced = plan.tranches.length > 0 && sum === totalPlan;
                 return (
                   <div key={plan.classeAnnuelleId} className="rounded-xl border border-slate-200 p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <h4 className="font-semibold text-slate-800">{plan.label}</h4>
-                      {plan.tranches.length > 0 && (
-                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                          {balanced ? 'Tranches équilibrées' : `Écart ${money(total - sum)}`}
-                        </span>
-                      )}
+                      {plan.tranches.length > 0 && <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{balanced ? 'Tranches équilibrées' : `Écart ${money(totalPlan - sum)}`}</span>}
                       {draft.plans.filter((p) => p !== plan && levelOf(p.label) === levelOf(plan.label)).length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => applyToLevel(planIndex)}
-                          disabled={!plan.montantTotal || !plan.tranches.length}
-                          className="shrink-0 text-xs font-semibold text-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          Appliquer à tout le niveau
-                        </button>
+                        <button type="button" onClick={() => applyToLevel(planIndex)} disabled={!plan.montantTotal || !plan.tranches.length} className="shrink-0 text-xs font-semibold text-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed">Appliquer à tout le niveau</button>
                       )}
                     </div>
-
                     <Input label="Tarif annuel (F CFA)" type="number" min="0.01" step="0.01" value={plan.montantTotal} onChange={(event) => setPlan(planIndex, 'montantTotal', event.target.value)} required/>
-
                     <div className="mt-4 space-y-3">
                       {plan.tranches.map((tranche, trancheIndex) => (
                         <div key={tranche.id || trancheIndex} className="grid grid-cols-3 gap-2">
@@ -178,7 +216,6 @@ const applyToLevel = (planIndex) => {
                         </div>
                       ))}
                     </div>
-
                     <button type="button" onClick={() => addTranche(planIndex)} className="mt-3 text-sm font-semibold text-emerald-700">+ Ajouter une tranche</button>
                   </div>
                 );
@@ -187,7 +224,10 @@ const applyToLevel = (planIndex) => {
           ) : <Empty>Créez d'abord une classe annuelle.</Empty>}
         </Panel>
 
-        <button className="primary">Enregistrer la configuration</button>
+        <div className="flex gap-2">
+          <button className="primary">Enregistrer la configuration</button>
+          <button type="button" onClick={() => setMode('view')} className="rounded-lg bg-slate-100 px-4 py-2.5 text-sm text-slate-700">Annuler</button>
+        </div>
       </form>
     </>
   );
@@ -490,6 +530,8 @@ function ClassStudents({ editable, classes, classDetail, setClassDetail, editing
 }
 function Accountant({ cash, paymentOptions = [], createPayment, setSection }) {
   const [studentId, setStudentId] = useState('');
+  const [studentQuery, setStudentQuery] = useState('');
+  const [showResults, setShowResults] = useState(false);
   const [modePaiement, setModePaiement] = useState('especes');
   const [montantRemis, setMontantRemis] = useState('');
   const [referencePaiement, setReferencePaiement] = useState('');
@@ -497,45 +539,56 @@ function Accountant({ cash, paymentOptions = [], createPayment, setSection }) {
 
   const student = paymentOptions.find((item) => item.inscriptionId === studentId);
   const total = Object.values(allocations).reduce((sum, value) => sum + Number(value || 0), 0);
+  const totalDu = (student?.obligations || []).reduce((sum, o) => sum + Number(o.reste || 0), 0);
+  const solde = student && total > 0 && total >= totalDu;
 
-  const setAllocation = (id, value) => {
-    setAllocations({ ...allocations, [id]: value });
+  const matches = studentQuery.trim()
+    ? paymentOptions.filter((item) => `${item.nom} ${item.prenom} ${item.matricule} ${item.classe}`.toLowerCase().includes(studentQuery.trim().toLowerCase())).slice(0, 8)
+    : [];
+
+  const selectStudent = (item) => {
+    setStudentId(item.inscriptionId);
+    setStudentQuery(`${item.nom} ${item.prenom} · ${item.classe}`);
+    setShowResults(false);
+    setAllocations({});
   };
+
+  const distribute = (amount) => {
+    let remaining = Number(amount) || 0;
+    const next = {};
+    (student?.obligations || []).filter((o) => o.reste > 0).forEach((o) => {
+      if (remaining <= 0) return;
+      const take = Math.min(remaining, o.reste);
+      next[o.id] = String(take);
+      remaining -= take;
+    });
+    setAllocations(next);
+  };
+
+  const setAllocation = (id, value) => setAllocations({ ...allocations, [id]: value });
 
   const submit = (event) => {
     event.preventDefault();
-
     createPayment({
       inscriptionId: studentId,
       modePaiement,
       montantRemis: modePaiement === 'especes' ? montantRemis : total,
       referencePaiement,
-      allocations: Object.entries(allocations)
-        .filter(([, value]) => Number(value) > 0)
-        .map(([obligationId, montant]) => ({ obligationId, montant })),
-    });
-
-    setAllocations({});
-    setMontantRemis('');
-    setReferencePaiement('');
+      allocations: Object.entries(allocations).filter(([, v]) => Number(v) > 0).map(([obligationId, montant]) => ({ obligationId, montant })),
+    }, `${student.nom} ${student.prenom}`);
+    setStudentId(''); setStudentQuery(''); setAllocations({}); setMontantRemis(''); setReferencePaiement('');
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-          Espace Comptabilité
-        </p>
-        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-          Caisse et inscriptions
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Enregistrez les inscriptions, encaissements et frais scolaires.
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Espace Comptabilité</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Caisse et inscriptions</h2>
+        <p className="mt-1 text-sm text-slate-500">Enregistrez les inscriptions, encaissements et frais scolaires.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <Card icon={<Banknote />} label="Encaissements du jour" value={money(cash?.today?.total)} />
+        <Card icon={<Banknote />} label="Encaissements de l'année en cours" value={money(cash?.today?.total)} />
         <Card icon={<Users />} label="Inscriptions actives" value={cash?.enrolledStudents || 0} />
         <Card icon={<CalendarDays />} label="Année active" value={cash?.activeYear?.libelle || 'Non configurée'} />
       </div>
@@ -544,31 +597,32 @@ function Accountant({ cash, paymentOptions = [], createPayment, setSection }) {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-5">
             <h3 className="font-semibold text-slate-900">Enregistrer un paiement</h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Sélectionnez l’élève, les frais concernés et le moyen de paiement.
-            </p>
+            <p className="mt-1 text-xs text-slate-500">Recherchez l'élève, sélectionnez les frais concernés et le moyen de paiement.</p>
           </div>
 
           <form onSubmit={submit} className="space-y-5">
-            <label className="block text-sm font-medium text-slate-700">
-              Élève
-              <select
-                className="input"
+            <div className="relative">
+              <label className="block text-sm font-medium text-slate-700">Élève</label>
+              <input
+                type="text"
+                value={studentQuery}
+                onChange={(event) => { setStudentQuery(event.target.value); setShowResults(true); setStudentId(''); }}
+                onFocus={() => setShowResults(true)}
+                placeholder="Rechercher par nom, prénom, matricule ou classe"
                 required
-                value={studentId}
-                onChange={(event) => {
-                  setStudentId(event.target.value);
-                  setAllocations({});
-                }}
-              >
-                <option value="">Choisir un élève</option>
-                {paymentOptions.map((item) => (
-                  <option key={item.inscriptionId} value={item.inscriptionId}>
-                    {item.nom} {item.prenom} · {item.classe}
-                  </option>
-                ))}
-              </select>
-            </label>
+                className="input mt-1"
+              />
+              {showResults && matches.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg">
+                  {matches.map((item) => (
+                    <button type="button" key={item.inscriptionId} onClick={() => selectStudent(item)} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-emerald-50">
+                      <span className="font-medium text-slate-800">{item.nom} {item.prenom}</span>
+                      <span className="text-xs text-slate-500">{item.matricule} · {item.classe}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {student && (
               <>
@@ -582,28 +636,23 @@ function Accountant({ cash, paymentOptions = [], createPayment, setSection }) {
                     <div key={obligation.id} className="grid gap-3 border-b border-slate-100 pb-4 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-end">
                       <div>
                         <p className="text-sm font-semibold text-slate-800">{obligation.libelle}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Reste : {money(obligation.reste)}
-                          {obligation.dateEcheance ? ` · Échéance ${obligation.dateEcheance}` : ''}
-                        </p>
+                        <p className="mt-1 text-xs text-slate-500">Reste : {money(obligation.reste)}{obligation.dateEcheance ? ` · Échéance ${obligation.dateEcheance}` : ''}</p>
                       </div>
-
-                      <Input
-                        label="Montant reçu"
-                        type="number"
-                        min="0"
-                        max={obligation.reste}
-                        step="0.01"
-                        value={allocations[obligation.id] || ''}
-                        onChange={(event) => setAllocation(obligation.id, event.target.value)}
-                      />
+                      <Input label="Montant soldé" type="number" min="0" max={obligation.reste} step="0.01" value={allocations[obligation.id] || ''} onChange={(event) => setAllocation(obligation.id, event.target.value)} />
                     </div>
                   ))}
                 </div>
 
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Total à enregistrer</p>
-                  <p className="mt-1 text-xl font-semibold text-slate-900">{money(total)}</p>
+                <div className={`rounded-xl border p-4 ${solde ? 'border-emerald-100 bg-emerald-50/50' : 'border-amber-100 bg-amber-50/50'}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-xs font-semibold uppercase tracking-wide ${solde ? 'text-emerald-700' : 'text-amber-700'}`}>Total à enregistrer</p>
+                      <p className="mt-1 text-xl font-semibold text-slate-900">{money(total)}</p>
+                    </div>
+                    <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${solde ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {solde ? 'Soldé' : `Reste ${money(totalDu - total)}`}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -614,31 +663,15 @@ function Accountant({ cash, paymentOptions = [], createPayment, setSection }) {
                       <option value="mobilemoney_banque">Mobile Money / banque</option>
                     </select>
                   </label>
-
                   {modePaiement === 'especes' ? (
-                    <Input
-                      label="Montant remis"
-                      type="number"
-                      min={total}
-                      step="0.01"
-                      value={montantRemis}
-                      onChange={(event) => setMontantRemis(event.target.value)}
-                      required
-                    />
+                    <Input label="Montant remis" type="number" min="0" step="0.01" value={montantRemis} onChange={(event) => { setMontantRemis(event.target.value); distribute(event.target.value); }} required />
                   ) : (
-                    <Input
-                      label="Référence de paiement"
-                      value={referencePaiement}
-                      onChange={(event) => setReferencePaiement(event.target.value)}
-                    />
+                    <Input label="Référence de paiement" value={referencePaiement} onChange={(event) => setReferencePaiement(event.target.value)} />
                   )}
                 </div>
 
-                <button
-                  className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={!total}
-                >
-                  Enregistrer et télécharger le reçu
+                <button className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={!total}>
+                  Enregistrer le paiement
                 </button>
               </>
             )}
@@ -649,32 +682,13 @@ function Accountant({ cash, paymentOptions = [], createPayment, setSection }) {
           <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Opérations</p>
             <h3 className="mt-2 font-semibold text-slate-900">Gestion des inscriptions</h3>
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              Enregistrez une inscription, une réinscription ou importez un fichier Excel.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => setSection('inscriptions')}
-              className="mt-5 w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-            >
-              Ouvrir les inscriptions
-            </button>
+            <p className="mt-2 text-xs leading-5 text-slate-500">Enregistrez une inscription, une réinscription ou importez un fichier Excel.</p>
+            <button type="button" onClick={() => setSection('inscriptions')} className="mt-5 w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">Ouvrir les inscriptions</button>
           </section>
-
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h3 className="font-semibold text-slate-900">Configuration des frais</h3>
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              Définissez les frais généraux, tranches et échéances de l’année scolaire.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => setSection('finances')}
-              className="mt-5 text-sm font-semibold text-emerald-700"
-            >
-              Gérer les frais
-            </button>
+            <p className="mt-2 text-xs leading-5 text-slate-500">Définissez les frais généraux, tranches et échéances de l'année scolaire.</p>
+            <button type="button" onClick={() => setSection('finances')} className="mt-5 text-sm font-semibold text-emerald-700">Gérer les frais</button>
           </section>
         </aside>
       </div>

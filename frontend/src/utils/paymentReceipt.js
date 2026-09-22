@@ -1,7 +1,7 @@
 import { degrees, PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 const clean = (value) => String(value ?? '').replace(/[^\x20-\xFF]/g, '');
-const money = (value) => `${Number(value || 0).toLocaleString('fr-FR')} F CFA`;
+const money = (value) => `${Number(value || 0).toLocaleString('fr-FR')} F CFA`.replace(/[\u202F\u00A0]/g, ' ');
 
 export const generatePaymentReceiptPDF = async ({ payment, student, allocations }) => {
   const pdf = await PDFDocument.create();
