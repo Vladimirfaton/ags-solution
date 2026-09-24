@@ -65,15 +65,13 @@ export default function DirectorWorkspace({ user, establishmentName, onLogout, s
             </div>
           )}
 
-          {error && (
-            <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-              {error}
-            </div>
-          )}
-
-          {notice && (
-            <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-              {notice}
+                    {(error || notice) && (
+            <div className="fixed inset-x-0 top-24 z-50 flex justify-center px-4 pointer-events-none">
+              <div className={`pointer-events-auto max-w-md rounded-xl border px-5 py-4 text-sm font-medium shadow-lg ${
+                error ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              }`}>
+                {error || notice}
+              </div>
             </div>
           )}
 

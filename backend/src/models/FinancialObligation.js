@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 export class FinancialObligation {
   static async createForEnrollment(client, { inscriptionId, anneeScolaireId, siteId, typeInscription }) {
     const annualClass = await client.query(`SELECT ca.classe_id, ca.division_nom, ca.code_affichage
@@ -24,11 +25,11 @@ export class FinancialObligation {
         AND (applicable_a = $3 OR applicable_a = 'les_deux')
       ORDER BY ordre, nom`, [anneeScolaireId, siteId, typeInscription]);
 
-    const obligations = [];
+        const obligations = [];
     for (const fee of fees.rows) {
       obligations.push((await client.query(`INSERT INTO obligations_financieres
         (inscription_id, type, source_config_id, libelle, montant_du, obligatoire, ordre)
-          VALUES ($1, 'frais_general', $2, $3, $4, $5, $6) RETURNING id, type, libelle, montant_du, obligatoire, date_echeance, ordre`,
+          VALUES ($1, 'frais_general', $2, $3, $4, $5, $6) RETURNING id, type, source_config_id, libelle, montant_du, obligatoire, date_echeance, ordre`,
       [inscriptionId, fee.id, fee.nom, fee.montant, fee.obligatoire, fee.ordre])).rows[0]);
     }
     for (const tranche of tranches.rows) {
@@ -38,5 +39,28 @@ export class FinancialObligation {
       [inscriptionId, tranche.id, `${classLabel} - ${tranche.nom}`, tranche.montant, tranche.date_echeance, 1000 + tranche.ordre])).rows[0]);
     }
     return obligations;
+  }
+    static async settleFees(client, { inscriptionId, obligations, paidFeeConfigIds, userId }) {
+    if (!Array.isArray(paidFeeConfigIds) || !paidFeeConfigIds.length) return null;
+    const toSettle = obligations.filter(
+      (o) => o.type === 'frais_general' && paidFeeConfigIds.includes(o.source_config_id)
+    );
+    if (!toSettle.length) return null;
+
+    const total = toSettle.reduce((sum, o) => sum + Number(o.montant_du), 0);
+    const receiptNumber = `REC-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${randomUUID().slice(0, 8).toUpperCase()}`;
+
+    const payment = await client.query(`INSERT INTO paiements
+      (inscription_id, numero_recu, mode_paiement, montant_remis, montant_encaisse, monnaie_rendue, recu_par)
+      VALUES ($1,$2,'especes',$3,$3,0,$4) RETURNING id`,
+    [inscriptionId, receiptNumber, total, userId]);
+
+    for (const obligation of toSettle) {
+      await client.query(
+        'INSERT INTO affectations_paiement (paiement_id, obligation_financiere_id, montant_affecte) VALUES ($1,$2,$3)',
+        [payment.rows[0].id, obligation.id, obligation.montant_du]
+      );
+    }
+    return payment.rows[0];
   }
 }

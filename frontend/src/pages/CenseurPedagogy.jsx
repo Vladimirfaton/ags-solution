@@ -73,8 +73,7 @@ export default function CenseurPedagogy() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Pédagogie</p>
-        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Équipe pédagogique</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-violet-700">Équipe pédagogique</h2>
         <p className="mt-1 text-sm text-slate-500">Structurez les matières, les professeurs et leurs affectations par classe.</p>
       </div>
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>}

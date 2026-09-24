@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import logger from './config/logger.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
@@ -13,7 +15,8 @@ import censeurRoutes from './routes/censeurRoutes.js';
 import { validateEnv } from './config/validateEnv.js';
 import { PLATFORM_NAME } from './config/branding.js';
 
-dotenv.config();
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+dotenv.config({ path: path.join(projectRoot, '.env') });
 validateEnv();
 
 const app = express();

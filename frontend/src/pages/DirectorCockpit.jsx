@@ -1,6 +1,6 @@
 import { Building2, CalendarDays, IdCard, MapPin, School, Users } from 'lucide-react';
 import EstablishmentStudentsPanel from './EstablishmentStudentsPanel';
-
+import SchoolYearPanel, { YearArchives } from './SchoolYearPanel';
 const formatNumber = (value) => Number(value || 0).toLocaleString('fr-FR');
 const classRank = (value = '') => {
   const level = value
@@ -33,17 +33,15 @@ const sortClasses = (classes = []) => [...classes].sort((a, b) => {
     sensitivity: 'base',
   });
 });
-export default function DirectorCockpit({ direction, yearForm, setYearForm, createYear, loadClass }) {
+export default function DirectorCockpit({ direction, schoolYears = [], yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear, loadClass }) {
   const sites = direction?.sites || [];
   const classes = sortClasses(direction?.classes || []);
   const totalStudents = sites.reduce((sum, site) => sum + Number(site.students_count || 0), 0);
-  const setYear = (key) => (event) => setYearForm({ ...yearForm, [key]: event.target.value });
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Espace Direction</p>
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Direction</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-emerald-700">Direction</h2>
         <p className="text-sm text-slate-500">Une vue claire pour piloter l'établissement au quotidien.</p>
       </div>
 
@@ -99,37 +97,11 @@ export default function DirectorCockpit({ direction, yearForm, setYearForm, crea
             </div>
           </section>
           <EstablishmentStudentsPanel />
+          <YearArchives schoolYears={schoolYears} />
         </div>
 
         <aside className="space-y-5">
-  {!direction?.anneeActive ? (
-    <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Première étape</p>
-      <h3 className="mt-2 font-semibold text-slate-900">Préparer l’année scolaire</h3>
-      <p className="mt-2 text-xs leading-5 text-slate-500">
-        Son activation permettra à la secrétaire de créer les classes et au comptable d’enregistrer les inscriptions.
-      </p>
-
-      <form onSubmit={createYear} className="mt-5 space-y-3">
-        <Field label="Libellé" placeholder="2026-2027" value={yearForm.libelle} onChange={setYear('libelle')} required />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Début" type="month" value={yearForm.dateDebut} onChange={setYear('dateDebut')} required />
-          <Field label="Fin" type="month" value={yearForm.dateFin} onChange={setYear('dateFin')} required />
-        </div>
-        <button className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
-          Activer l’année scolaire
-        </button>
-      </form>
-    </section>
-  ) : (
-    <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Année scolaire</p>
-      <h3 className="mt-2 font-semibold text-slate-900">{direction.anneeActive.libelle}</h3>
-      <p className="mt-2 text-xs leading-5 text-slate-500">
-        L’année est active. Les opérations de classes et d’inscriptions peuvent se poursuivre.
-      </p>
-    </section>
-  )}
+  <SchoolYearPanel {...{ direction, schoolYears, yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear }} />
 
   <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
     <div className="flex items-start gap-3">
@@ -171,6 +143,5 @@ function Metric({ icon, label, value, tone }) {
   return <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><span className={`grid h-9 w-9 place-items-center rounded-lg ${tones[tone]}`}>{icon}</span><p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 truncate text-sm font-semibold text-slate-900">{value}</p></div>;
 }
 
-function Field({ label, ...props }) { return <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}<input {...props} className="mt-2 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-slate-700 outline-none transition focus:border-emerald-500 focus:bg-white" /></label>; }
 function EmptyState({ children }) { return <p className="col-span-full rounded-xl border border-dashed border-slate-200 p-5 text-sm text-slate-500">{children}</p>; }
 function Alert({ tone, title, text }) { const styles = { amber: 'border-amber-400 bg-amber-50/50', rose: 'border-rose-400 bg-rose-50/50', emerald: 'border-emerald-400 bg-emerald-50/50' }; return <div className={`border-l-2 p-3 ${styles[tone]}`}><p className="text-xs font-semibold text-slate-800">{title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{text}</p></div>; }

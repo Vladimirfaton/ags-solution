@@ -27,6 +27,7 @@ export const createSchoolYear = async (req, res, next) => {
 export const listSchoolYears = async (_req, res, next) => { try { res.json({ annees: await Establishment.listSchoolYears() }); } catch (error) { next(error); } };
 export const activateSchoolYear = async (req, res, next) => { try { const anneeScolaire = await Establishment.activateSchoolYear(req.params.id); if (!anneeScolaire) return res.status(404).json({ error: 'Année brouillon introuvable.' }); res.json({ anneeScolaire }); } catch (error) { next(error); } };
 export const closeSchoolYear = async (req, res, next) => { try { const anneeScolaire = await Establishment.closeSchoolYear(req.params.id); if (!anneeScolaire) return res.status(404).json({ error: 'Année active introuvable.' }); res.json({ anneeScolaire }); } catch (error) { next(error); } };
+export const listYearClasses = async (req, res, next) => { try { res.json({ classes: await Establishment.listYearClasses(req.params.id) }); } catch (error) { next(error); } };
 
 export const createSite = async (req, res, next) => {
   try {
@@ -42,6 +43,14 @@ export const listClassStudents = async (req, res, next) => {
   try {
     const { StudentRegistry } = await import('../models/StudentRegistry.js');
     res.json(await StudentRegistry.listByClass(req.params.classId, await accessScopeFor(req.user)));
+  } catch (error) { next(error); }
+};
+export const listArchivedClassStudents = async (req, res, next) => {
+  try {
+    const { StudentRegistry } = await import('../models/StudentRegistry.js');
+    const data = await StudentRegistry.listByArchivedClass(req.params.classId, await accessScopeFor(req.user));
+    if (!data.classInfo) return res.status(404).json({ error: 'Classe archivée introuvable.' });
+    res.json(data);
   } catch (error) { next(error); }
 };
 

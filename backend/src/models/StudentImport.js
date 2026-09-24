@@ -29,7 +29,25 @@ const normalize = (value) => text(value)
   .replace(/\s+/g, ' ')
   .trim();
 
-const classKey = (value) => normalize(value);
+const LEVEL_ALIASES = {
+  6: '6e', '6e': '6e', '6eme': '6e',
+  5: '5e', '5e': '5e', '5eme': '5e',
+  4: '4e', '4e': '4e', '4eme': '4e',
+  3: '3e', '3e': '3e', '3eme': '3e',
+  '2nde': '2nde', '2nd': '2nde', seconde: '2nde',
+  '1ere': '1ere', '1re': '1re',
+  tle: 'tle', terminale: 'tle', term: 'tle',
+};
+
+const classKey = (value) => {
+  const normalized = normalize(value);
+  if (!normalized) return '';
+  const [first, ...rest] = normalized.split(' ');
+  const level = LEVEL_ALIASES[first];
+  if (!level) return normalized; // fallback pour le primaire (CM2, CE1...)
+  const division = rest.join('');
+  return division ? `${level} ${division}` : level;
+};
 
 const isoDate = (year, month, day) => {
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -316,8 +334,6 @@ export class StudentImport {
         siteId,
         (textQuery, params) => client.query(textQuery, params)
       );
-      if (review.errors.length) fail('Le fichier contient des erreurs.', 400, review.errors);
-      if (!review.rows.length) fail('Le fichier ne contient aucun élève à importer.');
 
       const students = [];
 
@@ -340,10 +356,10 @@ export class StudentImport {
           ]
         );
 
-        const enrollment = await client.query(
+               const enrollment = await client.query(
           `INSERT INTO inscriptions
             (eleve_id, annee_scolaire_id, site_id, type_inscription, created_by)
-           VALUES ($1,$2,$3,'inscription',$4)
+           VALUES ($1,$2,$3,'reinscription',$4)
            RETURNING id`,
           [student.rows[0].id, review.yearId, siteId, userId]
         );
@@ -359,14 +375,19 @@ export class StudentImport {
           inscriptionId: enrollment.rows[0].id,
           anneeScolaireId: review.yearId,
           siteId,
-          typeInscription: 'inscription',
+          typeInscription: 'reinscription',
         });
-
         students.push(student.rows[0]);
       }
 
       await client.query('COMMIT');
-      return { imported: students.length, students };
+        return {
+          imported: students.length,
+          rejected: parsed.rows.length - students.length,
+          total: parsed.rows.length,
+          students,
+          errors: review.errors,
+        };
     } catch (error) {
       await client.query('ROLLBACK');
       if (error.code === '23505') {
@@ -377,4 +398,5 @@ export class StudentImport {
       client.release();
     }
   }
+  
 }

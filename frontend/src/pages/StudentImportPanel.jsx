@@ -21,14 +21,15 @@ export default function StudentImportPanel() {
   };
 
   const confirm = async () => {
-    setBusy(true); setError(''); setMessage('');
-    try {
-      const result = (await comptabiliteAPI.confirmStudentImport(file)).data;
-      setMessage(`${result.imported || result.students?.length || 0} élève(s) importé(s) avec succès.`);
-      setPreview(null); setFile(null);
-    } catch (err) { setError(err.response?.data?.error || 'Import impossible.'); }
-    finally { setBusy(false); }
-  };
+  setBusy(true); setError(''); setMessage('');
+  try {
+    const result = (await comptabiliteAPI.confirmStudentImport(file)).data;
+    setMessage(`${result.imported}/${result.total} élève(s) importé(s). ${result.rejected}/${result.total} rejeté(s).`);
+    setPreview({ ...preview, errors: result.errors, valid: result.errors.length === 0 });
+    setFile(null);
+  } catch (err) { setError(err.response?.data?.error || 'Import impossible.'); }
+  finally { setBusy(false); }
+};
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -42,9 +43,21 @@ export default function StudentImportPanel() {
       </form>
       {error && <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
       {message && <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{message}</div>}
-      {preview && <div className="mt-5 border-t border-slate-100 pt-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">Aperçu de validation</p><p className="mt-1 text-xs text-slate-500">{preview.totalRows} ligne(s) détectée(s) · {preview.rows?.length || 0} ligne(s) prête(s)</p></div><span className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${preview.valid ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{preview.valid ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}{preview.valid ? 'Fichier valide' : 'Corrections nécessaires'}</span></div>
+      {preview && <div className="mt-5 border-t border-slate-100 pt-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">Aperçu de validation</p><p className="mt-1 text-xs text-slate-500">{preview.totalRows} ligne(s) détectée(s) · {preview.rows?.length || 0} ligne(s) prête(s)</p></div>{preview.valid ? (
+  <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+    <CheckCircle2 className="h-4 w-4" />Fichier valide
+  </span>
+) : (
+  <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+    <AlertTriangle className="h-4 w-4" />{preview.rows.length}/{preview.totalRows} valides · {preview.totalRows - preview.rows.length}/{preview.totalRows} invalides
+  </span>
+)}</div>
         {preview.errors?.length > 0 && <div className="mt-4 max-h-48 overflow-auto rounded-lg border border-rose-100 bg-rose-50/60 p-3"><p className="text-xs font-semibold text-rose-800">Erreurs détectées</p><ul className="mt-2 space-y-1 text-xs text-rose-700">{preview.errors.map((item) => <li key={item.line}>Ligne {item.line} : {item.messages.join(' ')}</li>)}</ul></div>}
-        {preview.valid && <button type="button" onClick={confirm} disabled={busy} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50">Confirmer l’import</button>}
+        {preview.rows.length > 0 && (
+          <button type="button" onClick={confirm} disabled={busy} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50">
+            Importer les {preview.rows.length} ligne(s) valide(s)
+          </button>
+        )}
       </div>}
     </section>
   );

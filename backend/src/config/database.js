@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
 import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-dotenv.config();
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+dotenv.config({ path: path.join(projectRoot, '.env') });
 
 const { Pool } = pg;
 
@@ -16,9 +19,11 @@ export const supabase = createClient(
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 10,                      // nombre max de connexions simultanées dans le pool
-  idleTimeoutMillis: 30000,     // ferme une connexion inactive après 30s
-  connectionTimeoutMillis: 5000, // abandonne si aucune connexion dispo après 5s (évite un blocage silencieux)
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 pool.on('error', (err) => {

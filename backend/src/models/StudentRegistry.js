@@ -11,20 +11,20 @@ export class StudentRegistry {
     const result = await query(`SELECT ${FIELDS} FROM eleves WHERE $1 = '%%' OR matricule ILIKE $1 OR nom ILIKE $1 OR prenom ILIKE $1 ORDER BY nom ASC, prenom ASC LIMIT 100`, [term]);
     return result.rows;
   }
-  static async create(data, userId, scope = { allSites: true, siteIds: [] }) {
+    static async create(data, userId, scope = { allSites: true, siteIds: [] }) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       const context = await client.query("SELECT id AS annee_id FROM annees_scolaires WHERE statut = 'active'");
       if (!context.rowCount) throw Object.assign(new Error('Configurez une année scolaire active.'), { status: 400, expose: true });
- const siteFilter = scope.allSites ? '' : ' AND site_id = ANY($3::uuid[])';
-       const annualClass = await client.query(
+      const siteFilter = scope.allSites ? '' : ' AND site_id = ANY($3::uuid[])';
+      const annualClass = await client.query(
         `SELECT id, site_id FROM classes_annuelles
         WHERE id = $1 AND annee_scolaire_id = $2 AND actif = true${siteFilter}`,
-       scope.allSites
-         ? [data.annualClassId, context.rows[0].annee_id]
-        : [data.annualClassId, context.rows[0].annee_id, scope.siteIds]
-    );
+        scope.allSites
+          ? [data.annualClassId, context.rows[0].annee_id]
+          : [data.annualClassId, context.rows[0].annee_id, scope.siteIds]
+      );
       if (!annualClass.rowCount) throw Object.assign(new Error('Classe annuelle invalide ou fermée.'), { status: 400, expose: true });
       const existing = await client.query('SELECT id FROM eleves WHERE matricule = $1', [data.matricule.trim()]);
       if (existing.rowCount) throw Object.assign(new Error('Ce matricule existe déjà dans le registre.'), { status: 409, expose: true });
@@ -34,7 +34,8 @@ export class StudentRegistry {
       const enrollment = await client.query(`INSERT INTO inscriptions (eleve_id, annee_scolaire_id, site_id, type_inscription, created_by)
         VALUES ($1,$2,$3,'inscription',$4) RETURNING id`, [student.rows[0].id, context.rows[0].annee_id, annualClass.rows[0].site_id, userId]);
       await client.query('INSERT INTO affectations_inscription (inscription_id, classe_annuelle_id, created_by) VALUES ($1,$2,$3)', [enrollment.rows[0].id, data.annualClassId, userId]);
-      await FinancialObligation.createForEnrollment(client, { inscriptionId: enrollment.rows[0].id, anneeScolaireId: context.rows[0].annee_id, siteId: annualClass.rows[0].site_id, typeInscription: 'inscription' });
+      const obligations = await FinancialObligation.createForEnrollment(client, { inscriptionId: enrollment.rows[0].id, anneeScolaireId: context.rows[0].annee_id, siteId: annualClass.rows[0].site_id, typeInscription: 'inscription' });
+      await FinancialObligation.settleFees(client, { inscriptionId: enrollment.rows[0].id, obligations, paidFeeConfigIds: data.paidFeeConfigIds, userId });
       await client.query('COMMIT');
       return student.rows[0];
     } catch (error) {
@@ -64,6 +65,19 @@ export class StudentRegistry {
       LEFT JOIN inscriptions i ON i.id = ai.inscription_id AND i.statut = 'active'
       LEFT JOIN eleves e ON e.id = i.eleve_id
       WHERE ca.id = $1 AND ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND ca.actif = true${siteFilter.sql}
+      ORDER BY e.nom, e.prenom`, [classId, ...siteFilter.params]);
+    return { classInfo: result.rows[0] ? { id: result.rows[0].classe_id, code_affichage: result.rows[0].code_affichage } : null, students: result.rows.filter((row) => row.id) };
+  }
+    static async listByArchivedClass(classId, scope) {
+    const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
+    const result = await query(`SELECT ca.id AS classe_id, ca.code_affichage, e.id, e.matricule, e.nom, e.prenom, e.sexe,
+      TO_CHAR(e.date_naissance, 'YYYY-MM-DD') AS date_naissance, e.lieu_naissance, e.nationalite, e.telephone
+      FROM classes_annuelles ca
+      JOIN annees_scolaires a ON a.id = ca.annee_scolaire_id AND a.statut = 'archivee'
+      LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true
+      LEFT JOIN inscriptions i ON i.id = ai.inscription_id
+      LEFT JOIN eleves e ON e.id = i.eleve_id
+      WHERE ca.id = $1${siteFilter.sql}
       ORDER BY e.nom, e.prenom`, [classId, ...siteFilter.params]);
     return { classInfo: result.rows[0] ? { id: result.rows[0].classe_id, code_affichage: result.rows[0].code_affichage } : null, students: result.rows.filter((row) => row.id) };
   }
@@ -109,36 +123,7 @@ export class StudentRegistry {
       await client.query('ROLLBACK');
       throw error;
     } finally { client.release(); }
-  }
-  static async listForEstablishment(search = '', scope, page = 1, pageSize = 10) {
-    const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
-    const term = `%${search.trim()}%`;
-    const offset = (Math.max(1, page) - 1) * pageSize;
-
-    const [rows, count] = await Promise.all([
-      query(`SELECT e.id, e.matricule, e.nom, e.prenom, e.sexe, ca.code_affichage, s.nom AS site_nom, n.ordre
-        FROM eleves e
-        JOIN inscriptions i ON i.eleve_id = e.id AND i.statut = 'active' AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
-        JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
-        JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
-        JOIN classes c ON c.id = ca.classe_id
-        JOIN niveaux_scolaires n ON n.code = c.niveau_code
-        JOIN sites s ON s.id = ca.site_id
-        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${siteFilter.sql}
-        ORDER BY n.ordre, ca.division_nom, e.nom, e.prenom
-        LIMIT $${siteFilter.params.length + 2} OFFSET $${siteFilter.params.length + 3}`,
-        [term, ...siteFilter.params, pageSize, offset]),
-      query(`SELECT COUNT(*)::int AS total
-        FROM eleves e
-        JOIN inscriptions i ON i.eleve_id = e.id AND i.statut = 'active' AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
-        JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
-        JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
-        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${siteFilter.sql}`,
-        [term, ...siteFilter.params]),
-    ]);
-
-    return { students: rows.rows, total: count.rows[0].total, page, pageSize };
-  }   
+  } 
     static async listForEstablishment(search = '', scope, page = 1, pageSize = 10) {
     const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
     const term = `%${search.trim()}%`;

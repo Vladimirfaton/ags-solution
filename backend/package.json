@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "dev": "nodemon --ignore logs --ignore uploads src/index.js",
     "setup-db": "node src/utils/setupDatabase.js",
     "migrate": "node-pg-migrate",
     "test": "vitest run",

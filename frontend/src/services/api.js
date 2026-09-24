@@ -81,6 +81,9 @@ export const directionAPI = {
   listSchoolYears: () => api.get('/direction/annees-scolaires'),
   activateSchoolYear: (id) => api.post(`/direction/annees-scolaires/${id}/activer`),
   closeSchoolYear: (id) => api.post(`/direction/annees-scolaires/${id}/cloturer`),
+  createSchoolYear: ({ libelle, dateDebut, dateFin }) => api.post('/direction/annees-scolaires', { libelle, moisDebut: dateDebut?.slice(0, 7), moisFin: dateFin?.slice(0, 7) }),
+  listYearClasses: (id) => api.get(`/direction/annees-scolaires/${id}/classes`),
+  listArchivedClassStudents: (classId) => api.get(`/direction/archives/classes/${classId}/eleves`),
 listStudents: (search = '', page = 1) => api.get('/direction/eleves', { params: { recherche: search, page, pageSize: 10 } }),
 };
 
@@ -116,6 +119,7 @@ export const comptabiliteAPI = {
   exportPaymentStatus: (params = {}) => api.get('/comptabilite/paiements/statut/export', { params, responseType: 'blob' }),
   paymentHistory: (search = '', page = 1) => api.get('/comptabilite/paiements/historique', { params: { recherche: search, page, pageSize: 10 } }),
   getPaymentReceipt: (id) => api.get(`/comptabilite/paiements/${id}/recu`),
+  overdueInstallments: (search = '') => api.get('/comptabilite/paiements/echeances-depassees', { params: { recherche: search } }),
 };
 
 export const censeurAPI = {

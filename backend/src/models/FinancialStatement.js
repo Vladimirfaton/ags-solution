@@ -31,7 +31,8 @@ const baseCte = (filterSql) => `
     SELECT i.id AS inscription_id, e.matricule, e.nom, e.prenom, ca.code_affichage, ca.id AS classe_annuelle_id,
       n.ordre, ca.division_nom,
       COALESCE(due.total_du, 0) AS total_du,
-      COALESCE(paid.total_paye, 0) AS total_paye
+      COALESCE(paid.total_paye, 0) AS total_paye,
+      COALESCE(fees.impayes, 0) AS frais_impayes
     FROM inscriptions i
     JOIN eleves e ON e.id = i.eleve_id
     JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
@@ -41,6 +42,7 @@ const baseCte = (filterSql) => `
     LEFT JOIN (
       SELECT o.inscription_id, SUM(o.montant_du) AS total_du
       FROM obligations_financieres o
+      WHERE o.type = 'tranche_scolarite'
       GROUP BY o.inscription_id
     ) due ON due.inscription_id = i.id
     LEFT JOIN (
@@ -48,8 +50,21 @@ const baseCte = (filterSql) => `
       FROM obligations_financieres o
       JOIN affectations_paiement ap ON ap.obligation_financiere_id = o.id
       JOIN paiements p ON p.id = ap.paiement_id AND p.statut = 'confirme'
+      WHERE o.type = 'tranche_scolarite'
       GROUP BY o.inscription_id
     ) paid ON paid.inscription_id = i.id
+    LEFT JOIN (
+      SELECT o.inscription_id, COUNT(*)::int AS impayes
+      FROM obligations_financieres o
+      LEFT JOIN (
+        SELECT ap.obligation_financiere_id, SUM(ap.montant_affecte) AS paye
+        FROM affectations_paiement ap
+        JOIN paiements p ON p.id = ap.paiement_id AND p.statut = 'confirme'
+        GROUP BY ap.obligation_financiere_id
+      ) pf ON pf.obligation_financiere_id = o.id
+      WHERE o.type = 'frais_general' AND o.obligatoire = true AND o.montant_du - COALESCE(pf.paye, 0) > 0
+      GROUP BY o.inscription_id
+    ) fees ON fees.inscription_id = i.id
     WHERE i.statut = 'active'
       AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
       ${filterSql}
@@ -93,7 +108,7 @@ export class FinancialStatement {
     return {
       students: rows.rows.map((row) => ({
         matricule: row.matricule, nom: row.nom, prenom: row.prenom, classe: row.code_affichage,
-        totalDu: Number(row.total_du), totalPaye: Number(row.total_paye), reste: Number(row.reste), statut: row.statut,
+        totalDu: Number(row.total_du), totalPaye: Number(row.total_paye), reste: Number(row.reste), statut: row.statut, fraisImpayes: Number(row.frais_impayes),
       })),
       total: count.rows[0].total, page, pageSize,
     };
@@ -108,7 +123,7 @@ export class FinancialStatement {
       ORDER BY ordre, division_nom, nom, prenom`, [...params, ...statutParams]);
     return result.rows.map((row) => ({
       matricule: row.matricule, nom: row.nom, prenom: row.prenom, classe: row.code_affichage,
-      totalDu: Number(row.total_du), totalPaye: Number(row.total_paye), reste: Number(row.reste), statut: row.statut,
+      totalDu: Number(row.total_du), totalPaye: Number(row.total_paye), reste: Number(row.reste), statut: row.statut, fraisImpayes: Number(row.frais_impayes),
     }));
   }
 }

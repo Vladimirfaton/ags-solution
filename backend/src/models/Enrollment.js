@@ -40,7 +40,7 @@ const studentsQuery = scope.allSites
     ]);
    return { year: year.rows[0], siteId, students: students.rows, classes: classes.rows };
   }
-    static async create({ studentId, annualClassId, siteId: requestedSiteId }, userId, scope) {
+    static async create({ studentId, annualClassId, siteId: requestedSiteId, paidFeeConfigIds }, userId, scope) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -57,7 +57,8 @@ const studentsQuery = scope.allSites
       const inscription = await client.query(`INSERT INTO inscriptions (eleve_id, annee_scolaire_id, site_id, type_inscription, created_by)
         VALUES ($1,$2,$3,'reinscription',$4) RETURNING id, statut, date_inscription`, [studentId, yearId, siteId, userId]);
       await client.query('INSERT INTO affectations_inscription (inscription_id, classe_annuelle_id, created_by) VALUES ($1,$2,$3)', [inscription.rows[0].id, annualClassId, userId]);
-      await FinancialObligation.createForEnrollment(client, { inscriptionId: inscription.rows[0].id, anneeScolaireId: yearId, siteId, typeInscription: 'reinscription' });
+      const obligations = await FinancialObligation.createForEnrollment(client, { inscriptionId: inscription.rows[0].id, anneeScolaireId: yearId, siteId, typeInscription: 'reinscription' });
+      await FinancialObligation.settleFees(client, { inscriptionId: inscription.rows[0].id, obligations, paidFeeConfigIds, userId });
       await client.query('COMMIT');
       return inscription.rows[0];
     } catch (error) {

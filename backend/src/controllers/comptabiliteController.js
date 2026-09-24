@@ -3,6 +3,7 @@ import { Enrollment } from '../models/Enrollment.js';
 import { StudentRegistry } from '../models/StudentRegistry.js';
 import { Payment } from '../models/Payment.js';
 import { accessScopeFor } from '../models/AccessScope.js';
+import { OverdueInstallments } from '../models/OverdueInstallments.js';
 
 export const getCashOverview = async (req, res, next) => {
  try { res.json(await CashRegister.overview(await accessScopeFor(req.user))); } catch (error) { next(error); }
@@ -50,10 +51,10 @@ export const exportPaymentStatus = async (req, res, next) => {
     const scope = await accessScopeFor(req.user);
     const rows = await FinancialStatement.exportRows(scope, { search: req.query.recherche || '', classeAnnuelleId: req.query.classeId || null, statut: req.query.statut || 'tous' });
     const statutLabel = { solde: 'Soldé', partiel: 'Partiel', impaye: 'Impayé' };
-    const header = ['Matricule', 'Nom', 'Prénom', 'Classe', 'Montant dû', 'Montant payé', 'Reste', 'Statut'];
+    const header = ['Matricule', 'Nom', 'Prénom', 'Classe', 'Montant dû', 'Montant payé', 'Reste', 'Statut', 'Frais généraux impayés'];
     const lines = [header.map(csvEscape).join(';')];
     for (const row of rows) {
-      lines.push([row.matricule, row.nom, row.prenom, row.classe, row.totalDu, row.totalPaye, row.reste, statutLabel[row.statut]].map(csvEscape).join(';'));
+      lines.push([row.matricule, row.nom, row.prenom, row.classe, row.totalDu, row.totalPaye, row.reste, statutLabel[row.statut], row.fraisImpayes > 0 ? 'Oui' : 'Non'].map(csvEscape).join(';'));
     }
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="statut-paiements.csv"');
@@ -70,4 +71,8 @@ export const getPaymentHistory = async (req, res, next) => {
 };
 export const getPaymentReceipt = async (req, res, next) => {
   try { res.json(await Payment.getReceiptData(req.params.id, await accessScopeFor(req.user))); } catch (error) { next(error); }
+};
+export const getOverdueInstallments = async (req, res, next) => {
+  try { res.json(await OverdueInstallments.list(await accessScopeFor(req.user), { search: req.query.recherche || '' })); }
+  catch (error) { next(error); }
 };

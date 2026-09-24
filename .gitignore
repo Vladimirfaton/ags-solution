@@ -2,7 +2,6 @@ node_modules/
 dist/
 build/
 .env
-.env.example
 .env.local
 .DS_Store
 *.log
@@ -15,3 +14,4 @@ package-lock.json
 yarn.lock
 .superdesign/tmp/
 bash
+superdesign

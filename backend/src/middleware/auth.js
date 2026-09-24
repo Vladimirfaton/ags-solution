@@ -19,6 +19,10 @@ export const authenticate = async (req, res, next) => {
     next();
   } catch (error) {
     logger.warn(`Authentification refusée: ${error.message}`);
+    if (['ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT', 'ENETUNREACH'].includes(error.code)
+      || error.message?.toLowerCase().includes('connection timeout')) {
+      return res.status(503).json({ error: 'Service de données temporairement indisponible' });
+    }
     return res.status(401).json({ error: 'Token invalide ou expiré' });
   }
 };
