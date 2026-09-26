@@ -40,6 +40,7 @@ export const initializePlatform = async (req, res, next) => {
     if (await Establishment.get()) return res.status(409).json({ error: 'La plateforme est déjà initialisée' });
     const { nom, type, sites = [] } = req.body;
     if (!nom) return res.status(400).json({ error: "Le nom de l'établissement est requis" });
+    if (!['primaire', 'college'].includes(type)) return res.status(400).json({ error: "Choisissez le type d'établissement : primaire ou college." });
     const etablissement = await Establishment.create({ nom, type });
     const cleanSites = Array.isArray(sites) ? sites.filter((site) => site?.nom?.trim()) : [];
     const primaryData = cleanSites[0] || { nom };
