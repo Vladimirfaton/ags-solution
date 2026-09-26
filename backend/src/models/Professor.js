@@ -171,10 +171,6 @@ export class Professor {
     if (!isPrimary && !matiereId) {
       fail('Une matière est obligatoire pour une affectation au collège ou au lycée.');
     }
-    if (isPrimary && matiereId) {
-      fail('Une affectation primaire ne doit pas contenir de matière.');
-    }
-
     if (matiereId) {
       const subject = await query(
         'SELECT id FROM matieres WHERE id = $1 AND actif = true',
@@ -192,7 +188,7 @@ export class Professor {
         professorId,
         annualClassId,
         matiereId || null,
-        isPrimary ? 'titulaire' : 'enseignement',
+        matiereId ? 'enseignement' : 'titulaire',
         userId,
       ]
     );

@@ -1,10 +1,13 @@
 import { query } from '../config/database.js';
 
 export const accessScopeFor = async (user) => {
-  if (user.role === 'directeur') return { allSites: true, siteIds: [] };
-  const result = await query(`SELECT site_id FROM acces_utilisateur_sites
-    WHERE user_id = $1 AND actif = true AND portee = 'site'`, [user.id]);
-  return { allSites: false, siteIds: result.rows.map(({ site_id }) => site_id) };
+  const result = await query(`SELECT site_id, portee FROM acces_utilisateur_sites
+    WHERE user_id = $1 AND actif = true`, [user.id]);
+  const allSites = result.rows.some(({ portee }) => portee === 'etablissement');
+  return {
+    allSites,
+    siteIds: allSites ? [] : result.rows.map(({ site_id }) => site_id).filter(Boolean),
+  };
 };
 
 export const resolveScopedSite = async (scope, requestedSiteId = null) => {

@@ -11,6 +11,9 @@ export const getCashOverview = async (req, res, next) => {
 export const getEnrollmentOptions = async (req, res, next) => {
  try { res.json(await Enrollment.options(await accessScopeFor(req.user), req.query.siteId)); } catch (error) { next(error); }
 };
+export const getClassesForStudent = async (req, res, next) => {
+  try { res.json({ classes: await Enrollment.classesForStudent(req.params.studentId, await accessScopeFor(req.user)) }); } catch (error) { next(error); }
+};
 export const createEnrollment = async (req, res, next) => {
   try {
     const { studentId, annualClassId, type = 'reinscription' } = req.body;

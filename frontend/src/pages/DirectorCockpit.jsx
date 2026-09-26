@@ -8,21 +8,27 @@ const classRank = (value = '') => {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 
-  const found = level.match(/(?:^|\s)(6|5|4|3)(?:e|eme)?|(?:^|\s)(2nde|2nd|seconde|1ere|1re|tle|terminale)/);
+  const found = level.match(/(?:^|\s)(ci|cp|ce1|ce2|cm1|cm2|6|5|4|3)(?:e|eme)?|(?:^|\s)(2nde|2nd|seconde|1ere|1re|tle|terminale)/);
   const key = found?.[1] || found?.[2] || '';
 
   return ({
-    6: 1,
-    5: 2,
-    4: 3,
-    3: 4,
-    '2nde': 5,
-    '2nd': 5,
-    seconde: 5,
-    '1ere': 6,
-    '1re': 6,
-    tle: 7,
-    terminale: 7,
+    ci: 1,
+    cp: 2,
+    ce1: 3,
+    ce2: 4,
+    cm1: 5,
+    cm2: 6,
+    6: 10,
+    5: 11,
+    4: 12,
+    3: 13,
+    '2nde': 14,
+    '2nd': 14,
+    seconde: 14,
+    '1ere': 15,
+    '1re': 15,
+    tle: 16,
+    terminale: 16,
   })[key] || 99;
 };
 

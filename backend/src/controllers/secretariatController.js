@@ -1,9 +1,19 @@
 import { StudentRegistry } from '../models/StudentRegistry.js';
 import { AcademicStructure } from '../models/AcademicStructure.js';
 import { accessScopeFor } from '../models/AccessScope.js';
+import { SchoolLevel } from '../models/SchoolLevel.js';
 
+export const listCycles = async (_req, res, next) => {
+  try { res.json({ cycles: await SchoolLevel.listCycles() }); } catch (error) { next(error); }
+};
+export const listLevels = async (_req, res, next) => {
+  try { res.json({ niveaux: await SchoolLevel.list() }); } catch (error) { next(error); }
+};
+export const createLevel = async (req, res, next) => {
+  try { res.status(201).json({ niveau: await SchoolLevel.create(req.body) }); } catch (error) { next(error); }
+};
 export const listStudents = async (req, res, next) => {
-  try { res.json({ students: await StudentRegistry.list(req.query.recherche || '') }); } catch (error) { next(error); }
+  try { res.json({ students: await StudentRegistry.list(req.query.recherche || '', await accessScopeFor(req.user)) }); } catch (error) { next(error); }
 };
 export const listClasses = async (req, res, next) => {
   try { res.json(await AcademicStructure.listAnnualClasses(await accessScopeFor(req.user))); } catch (error) { next(error); }

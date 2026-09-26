@@ -10,7 +10,6 @@ export const sendAssistance = async (req, res) => {
     }
 
     const user = req.user; // après authenticate
-    const collegeId = user.college_id;
     // Récupérer les infos du collège si besoin (on peut les passer depuis le frontend)
     // Mais on peut aussi les lire dans la base.
     // On va utiliser les données envoyées par le frontend pour plus de flexibilité.

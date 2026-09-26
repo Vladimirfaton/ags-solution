@@ -9,11 +9,12 @@ const roleLabel = (role) => ({ directeur: 'Directeur', secretaire: 'Secrétaire'
 export class User {
   static async createDefaultManagementAccounts({ credentials }) {
     const result = [];
+    const establishment = await query('SELECT id FROM etablissement WHERE singleton = true');
     const site = await query('SELECT id FROM sites WHERE est_principal = true');
     for (const { role, password } of credentials) {
       const passwordHash = await bcrypt.hash(password, 10);
       const nom = roleLabel(role);
-      const created = await query(`INSERT INTO users (id, username, password_hash, role, nom, status, password_personalized, username_locked) VALUES ($1, $2, $3, $4, $5, 'active', false, false) RETURNING id, username, role, nom, status`, [randomUUID(), role, passwordHash, role, nom]);
+      const created = await query(`INSERT INTO users (id, etablissement_id, username, password_hash, role, nom, status, password_personalized, username_locked) VALUES ($1, $2, $3, $4, $5, $6, 'active', false, false) RETURNING id, username, role, nom, status`, [randomUUID(), establishment.rows[0]?.id || null, role, passwordHash, role, nom]);
       const access = await query(`INSERT INTO acces_utilisateur_sites (user_id, site_id, designation, portee)
         VALUES ($1, $2, $3, $4) RETURNING id`, [created.rows[0].id, role === 'directeur' ? null : site.rows[0]?.id || null, role, role === 'directeur' ? 'etablissement' : 'site']);
       await query(`INSERT INTO acces_utilisateur_profils (acces_id, profil_id)
@@ -24,6 +25,20 @@ export class User {
   }
   static async findByEmail(email) { const result = await query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email.trim()]); return result.rows[0] || null; }
   static async findByUsername(username) { const result = await query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); return result.rows[0] || null; }
+  static async findByCollege(etablissementId) {
+    const result = await query(`SELECT id, email, role, username, nom, prenom, telephone, status, disabled_at, password_personalized
+      FROM users WHERE etablissement_id = $1 AND role = ANY($2::varchar[]) ORDER BY role, nom, prenom`, [etablissementId, MANAGEMENT_ROLES]);
+    return result.rows;
+  }
+  static async suggestUniqueUsername(prenom, nom) {
+    const first = normalizeUsername(prenom || '').charAt(0).toUpperCase();
+    const last = normalizeUsername(nom || '').replace(/\s+/g, '');
+    const base = normalizeUsername(`${first}${last}`) || 'utilisateur';
+    let username = base;
+    let suffix = 2;
+    while ((await query('SELECT 1 FROM users WHERE LOWER(username) = LOWER($1)', [username])).rowCount) username = `${base}${suffix++}`;
+    return username;
+  }
 static async findById(id) { const result = await query(`SELECT id, email, role, username, username_locked, nom, prenom, telephone, status, disabled_at, password_personalized, created_at FROM users WHERE id = $1`, [id]); return result.rows[0] || null; }
   static async permissionsFor(userId) {
     const result = await query(`SELECT DISTINCT pp.permission_code
@@ -84,4 +99,26 @@ static async setProfile(userId, { nom, prenom, email, telephone, username: reque
   }
   static async verifyPassword(password, passwordHash) { return Boolean(passwordHash) && bcrypt.compare(password, passwordHash); }
   static isManagementRole(role) { return MANAGEMENT_ROLES.includes(role); }
+  static async createSiteManagementAccounts({ siteId, siteNom, credentials }) {
+  const prefixes = { secretaire: 'Sec', comptable: 'Compt', censeur: 'Cens' };
+  const siteSlug = siteNom.trim().replace(/[^a-zA-Z0-9]/g, '');
+  const establishment = await query('SELECT id FROM etablissement WHERE singleton = true');
+  const result = [];
+  for (const { role, password } of credentials) {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const base = `${prefixes[role]}-${siteSlug}`;
+    let username = base;
+    let suffix = 2;
+    while (true) {
+      const duplicate = await query('SELECT 1 FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+      if (!duplicate.rowCount) break;
+      username = `${base}${suffix++}`;
+    }
+    const created = await query(`INSERT INTO users (id, etablissement_id, username, password_hash, role, nom, status, password_personalized, username_locked) VALUES ($1, $2, $3, $4, $5, $6, 'active', false, false) RETURNING id, username, role, nom, status`, [randomUUID(), establishment.rows[0]?.id || null, username, passwordHash, role, roleLabel(role)]);
+    const access = await query(`INSERT INTO acces_utilisateur_sites (user_id, site_id, designation, portee) VALUES ($1, $2, $3, 'site') RETURNING id`, [created.rows[0].id, siteId, role]);
+    await query(`INSERT INTO acces_utilisateur_profils (acces_id, profil_id) SELECT $1, id FROM profils_acces WHERE designation = $2`, [access.rows[0].id, role]);
+    result.push(created.rows[0]);
+  }
+  return result;
+}
 }

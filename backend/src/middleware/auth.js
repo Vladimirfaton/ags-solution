@@ -3,6 +3,24 @@ import logger from '../config/logger.js';
 import { User } from '../models/User.js';
 import { Admin } from '../models/Admin.js';
 import { Session } from '../models/Session.js';
+import { accessScopeFor } from '../models/AccessScope.js';
+
+const DATABASE_ERROR_CODES = new Set([
+  '08000', '08001', '08003', '08004', '08006', '57P01', '57P02', '57P03',
+  '53300', '53400', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENETUNREACH', 'ENOTFOUND',
+]);
+
+const isDatabaseUnavailable = (error) => {
+  const code = error?.code;
+  const message = String(error?.message || '').toLowerCase();
+  return DATABASE_ERROR_CODES.has(code)
+    || message.includes('connection terminated')
+    || message.includes('connection timeout')
+    || message.includes('connection refused')
+    || message.includes('connection ended unexpectedly')
+    || message.includes('the server closed the connection unexpectedly')
+    || message.includes('terminating connection due to administrator command');
+};
 
 export const authenticate = async (req, res, next) => {
   try {
@@ -19,8 +37,8 @@ export const authenticate = async (req, res, next) => {
     next();
   } catch (error) {
     logger.warn(`Authentification refusée: ${error.message}`);
-    if (['ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT', 'ENETUNREACH'].includes(error.code)
-      || error.message?.toLowerCase().includes('connection timeout')) {
+    if (isDatabaseUnavailable(error)) {
+      logger.error(`Base de données indisponible pendant l'authentification: ${error.code || error.message}`);
       return res.status(503).json({ error: 'Service de données temporairement indisponible' });
     }
     return res.status(401).json({ error: 'Token invalide ou expiré' });
@@ -32,9 +50,9 @@ export const authorize = (roles = []) => (req, res, next) => {
   if (roles.length && !roles.includes(req.user.role)) return res.status(403).json({ error: 'Accès non autorisé' });
   next();
 };
-const ROLE_PERMISSIONS = Object.freeze({
-directeur: ['etablissement.consulter', 'annee_scolaire.gerer', 'classe.consulter', 'eleve.consulter'],
-secretaire: ['classe.consulter', 'classe.gerer', 'eleve.consulter', 'eleve.modifier', 'eleve.transferer'],
+export const ROLE_PERMISSIONS = Object.freeze({
+ directeur: ['etablissement.consulter', 'annee_scolaire.gerer', 'classe.consulter', 'eleve.consulter', 'fvs.consulter', 'fvs.activer'],
+ secretaire: ['classe.consulter', 'classe.gerer', 'eleve.consulter', 'eleve.modifier', 'eleve.transferer', 'fvs.consulter'],
  comptable: ['classe.consulter', 'eleve.consulter', 'inscription.creer', 'frais.gerer', 'caisse.gerer'],
  censeur: [
    'classe.consulter',
@@ -42,6 +60,7 @@ secretaire: ['classe.consulter', 'classe.gerer', 'eleve.consulter', 'eleve.modif
    'professeur.consulter',
    'professeur.gerer',
    'professeur.affecter_classes',
+   'fvs.consulter',
  ],
 });
 export const authorizePermission = (...permissions) => (req, res, next) => {
@@ -56,6 +75,16 @@ export const authorizePermission = (...permissions) => (req, res, next) => {
 export const authorizeManagement = (req, res, next) => {
   if (req.user?.accountType !== 'gestion') return res.status(403).json({ error: 'Accès non autorisé' });
   next();
+};
+
+export const resolveSiteScope = async (req, _res, next) => {
+  if (req.user?.accountType !== 'gestion') return next();
+  try {
+    req.user.siteScope = await accessScopeFor(req.user);
+    next();
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const checkAccountActive = (_req, _res, next) => next();

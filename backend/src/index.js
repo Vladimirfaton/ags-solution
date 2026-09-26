@@ -12,6 +12,7 @@ import directionRoutes from './routes/directionRoutes.js';
 import secretariatRoutes from './routes/secretariatRoutes.js';
 import comptabiliteRoutes from './routes/comptabiliteRoutes.js';
 import censeurRoutes from './routes/censeurRoutes.js';
+import cardServiceRoutes from './routes/cardServiceRoutes.js';
 import { validateEnv } from './config/validateEnv.js';
 import { PLATFORM_NAME } from './config/branding.js';
 
@@ -44,6 +45,7 @@ app.use('/api/direction', directionRoutes);
 app.use('/api/secretariat', secretariatRoutes);
 app.use('/api/comptabilite', comptabiliteRoutes);
 app.use('/api/censeur', censeurRoutes);
+app.use('/api/cartes', cardServiceRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

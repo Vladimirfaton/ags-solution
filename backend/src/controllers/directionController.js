@@ -38,7 +38,7 @@ export const createSite = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-export const listClasses = async (_req, res, next) => { try { res.json(await AcademicStructure.listAnnualClasses()); } catch (error) { next(error); } };
+export const listClasses = async (req, res, next) => { try { res.json(await AcademicStructure.listAnnualClasses(await accessScopeFor(req.user))); } catch (error) { next(error); } };
 export const listClassStudents = async (req, res, next) => {
   try {
     const { StudentRegistry } = await import('../models/StudentRegistry.js');

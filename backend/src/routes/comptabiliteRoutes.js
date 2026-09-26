@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { createEnrollment, createPayment, exportPaymentStatus, getCashOverview, getEnrollmentOptions, getOverdueInstallments, getPaymentHistory, getPaymentReceipt, getPaymentOptions, getPaymentStatus } from '../controllers/comptabiliteController.js';
+import { createEnrollment, createPayment, exportPaymentStatus, getCashOverview, getClassesForStudent, getEnrollmentOptions, getOverdueInstallments, getPaymentHistory, getPaymentReceipt, getPaymentOptions, getPaymentStatus } from '../controllers/comptabiliteController.js';
 import { getFinancialConfiguration, saveFinancialConfiguration } from '../controllers/directionController.js';
 import { confirmStudentImport, previewStudentImport } from '../controllers/studentImportController.js';
 import { authenticate, authorizePermission } from '../middleware/auth.js';
@@ -21,6 +21,7 @@ const importUpload = multer({
 router.use(authenticate);
 router.get('/caisse', authorizePermission('caisse.gerer'), getCashOverview);
 router.get('/inscriptions/options', authorizePermission('inscription.creer'), getEnrollmentOptions);
+router.get('/inscriptions/eleve/:studentId/classes', authorizePermission('inscription.creer'), getClassesForStudent);
 router.post('/inscriptions', authorizePermission('inscription.creer'), createEnrollment);
 router.post('/imports/eleves/apercu', authorizePermission('inscription.creer'), importUpload.single('file'), previewStudentImport);
 router.post('/imports/eleves/confirmer', authorizePermission('inscription.creer'), importUpload.single('file'), confirmStudentImport);

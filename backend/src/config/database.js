@@ -27,7 +27,7 @@ export const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('Pool error:', err);
+  console.error('Pool PostgreSQL error:', { code: err.code, message: err.message });
 });
 
 export const query = (text, params) => {

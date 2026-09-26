@@ -6,9 +6,18 @@ import { scopedWhere } from './AccessScope.js';
 const FIELDS = `id, matricule, nom, prenom, sexe, TO_CHAR(date_naissance, 'YYYY-MM-DD') AS date_naissance, lieu_naissance, nationalite, telephone, created_at, updated_at`;
 
 export class StudentRegistry {
-  static async list(search = '') {
+  static async list(search = '', scope = { allSites: true, siteIds: [] }) {
     const term = `%${search.trim()}%`;
-    const result = await query(`SELECT ${FIELDS} FROM eleves WHERE $1 = '%%' OR matricule ILIKE $1 OR nom ILIKE $1 OR prenom ILIKE $1 ORDER BY nom ASC, prenom ASC LIMIT 100`, [term]);
+    const siteFilter = scopedWhere(scope, 'i.site_id', 2);
+    const result = await query(`SELECT DISTINCT e.id, e.matricule, e.nom, e.prenom, e.sexe,
+      TO_CHAR(e.date_naissance, 'YYYY-MM-DD') AS date_naissance, e.lieu_naissance, e.nationalite,
+      e.telephone, e.created_at, e.updated_at
+      FROM eleves e
+      JOIN inscriptions i ON i.eleve_id = e.id
+      WHERE ($1 = '%%' OR e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1)
+        AND i.statut = 'active'
+        AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')${siteFilter.sql}
+      ORDER BY e.nom ASC, e.prenom ASC LIMIT 100`, [term, ...siteFilter.params]);
     return result.rows;
   }
     static async create(data, userId, scope = { allSites: true, siteIds: [] }) {
@@ -46,14 +55,16 @@ export class StudentRegistry {
     }
   }
   static async listClasses(scope) {
-    const siteFilter = scopedWhere(scope, 'ca.site_id', 1);
+    const establishment = await query('SELECT type FROM etablissement WHERE singleton = true');
+    const allowedLevels = establishment.rows[0]?.type === 'primaire' ? ['CI', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'] : ['6e', '5e', '4e', '3e', '2nde', '1ere', 'terminale'];
+    const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
     const result = await query(`SELECT ca.id, ca.code_affichage, ca.division_nom, s.nom AS site_nom, n.ordre, COUNT(ai.id)::int AS effectif
       FROM classes_annuelles ca
-      JOIN classes c ON c.id = ca.classe_id JOIN niveaux_scolaires n ON n.code = c.niveau_code
-      JOIN sites s ON s.id = ca.site_id
+      JOIN classes c ON c.id = ca.classe_id JOIN niveaux_scolaires n ON n.id = c.niveau_id
+        JOIN sites s ON s.id = ca.site_id
       LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true
-      WHERE ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND ca.actif = true${siteFilter.sql}
-      GROUP BY ca.id, s.nom, n.ordre ORDER BY n.ordre, ca.division_nom`, siteFilter.params);
+      WHERE ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND ca.actif = true AND n.code = ANY($1::text[])${siteFilter.sql}
+      GROUP BY ca.id, s.nom, n.ordre ORDER BY n.ordre, ca.division_nom`, [allowedLevels, ...siteFilter.params]);
     return result.rows;
   }
   static async listByClass(classId, scope) {
@@ -101,11 +112,12 @@ export class StudentRegistry {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      const sourceSiteFilter = scope.allSites ? '' : ' AND ca.site_id = ANY($2::uuid[])';
       const source = await client.query(`SELECT i.id AS inscription_id, ai.id AS affectation_id, ca.id AS classe_id, ca.site_id
         FROM inscriptions i JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
         JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
-         WHERE i.eleve_id = $1 AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND i.statut = 'active'
-        FOR UPDATE OF i, ai`, [studentId]);
+         WHERE i.eleve_id = $1 AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND i.statut = 'active'${sourceSiteFilter}
+        FOR UPDATE OF i, ai`, scope.allSites ? [studentId] : [studentId, scope.siteIds]);
       const destination = await client.query(`SELECT id, site_id FROM classes_annuelles
         WHERE id = $1 AND annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND actif = true`, [destinationClassId]);
       if (!source.rowCount || !destination.rowCount) throw Object.assign(new Error('Transfert impossible : élève ou classe de destination invalide.'), { status: 400, expose: true });
@@ -135,7 +147,7 @@ export class StudentRegistry {
         JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
         JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
         JOIN classes c ON c.id = ca.classe_id
-        JOIN niveaux_scolaires n ON n.code = c.niveau_code
+        JOIN niveaux_scolaires n ON n.id = c.niveau_id
         JOIN sites s ON s.id = ca.site_id
         WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${siteFilter.sql}
         ORDER BY n.ordre, ca.division_nom, e.nom, e.prenom

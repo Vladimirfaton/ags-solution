@@ -5,7 +5,7 @@ import { censeurAPI } from '../services/api';
 const blankProfessor = { nom: '', prenom: '', sexe: '', telephone: '', email: '' };
 const blankSubject = { nom: '', code: '' };
 
-export default function CenseurPedagogy() {
+export default function CenseurPedagogy({ establishmentType = 'college' }) {
   const [professors, setProfessors] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);

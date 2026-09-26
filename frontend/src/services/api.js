@@ -120,6 +120,7 @@ export const comptabiliteAPI = {
   paymentHistory: (search = '', page = 1) => api.get('/comptabilite/paiements/historique', { params: { recherche: search, page, pageSize: 10 } }),
   getPaymentReceipt: (id) => api.get(`/comptabilite/paiements/${id}/recu`),
   overdueInstallments: (search = '') => api.get('/comptabilite/paiements/echeances-depassees', { params: { recherche: search } }),
+  classesForStudent: (studentId) => api.get(`/comptabilite/inscriptions/eleve/${studentId}/classes`),
 };
 
 export const censeurAPI = {
@@ -137,87 +138,13 @@ export const censeurAPI = {
   endAssignment: (id) => api.put(`/censeur/affectations/${id}/terminer`),
 };
 
-export const collegeAPI = {
-  getAll: () => api.get('/colleges'),
-  getByCommune: (commune, departement) =>
-    api.get('/colleges/commune', { params: { commune, departement } }),
-  getById: (id) => api.get(`/colleges/${id}`),
-  create: (data) => api.post('/colleges', data),
-  update: (id, data) => api.put(`/colleges/${id}`, data),
-  delete: (id) => api.delete(`/colleges/${id}`),
-  uploadSignature: (id, file) => {
-    const formData = new FormData();
-    formData.append('signature', file);
-    return api.post(`/colleges/${id}/signature`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-  getStats: (id) => api.get(`/colleges/${id}/stats`),
-  notifierBrouillon: (id, classeId = null) =>
-  api.post(`/colleges/${id}/notifier-brouillon`, { classe_id: classeId }),
-  getNotificationsBrouillon: (id) =>
-  api.get(`/colleges/${id}/notifications-brouillon`),
-    notifierCartes: (id, { classeId = null, datePassage }) =>
-    api.post(`/colleges/${id}/notifier-cartes`, { classe_id: classeId, date_passage: datePassage }),
-  getNotificationsCartes: (id) =>
-    api.get(`/colleges/${id}/notifications-cartes`),
-  // Comptes de gestion
-  createManagementAccounts: (id, data) => api.post(`/colleges/${id}/comptes-gestion`, data),
-  getManagementAccounts: (id) => api.get(`/colleges/${id}/comptes-gestion`),
-  resendManagementActivationEmails: (id) => api.post(`/colleges/${id}/comptes-gestion/resend`),
+export const cartesAPI = {
+  status: () => api.get('/cartes/statut'),
+  setStatus: (actif) => api.put('/cartes/statut', { actif }),
+  stats: () => api.get('/cartes/stats'),
+  preview: (classId) => api.get(`/cartes/classes/${classId}/preview`),
 };
 
-export const classAPI = {
-  getByCollege: (collegeId) => api.get(`/classes/${collegeId}/classes`),
-  getById: (classId) => api.get(`/classes/class/${classId}`),
-  create: (collegeId, data) => api.post(`/classes/${collegeId}/classes`, data),
-  update: (classId, data) => api.put(`/classes/class/${classId}`, data),
-  delete: (classId) => api.delete(`/classes/class/${classId}`),
-  // Observations
-  listObservations: (classId) => api.get(`/classes/class/${classId}/observations`),
-  createObservation: (classId, contenu, eleveId = null) => 
-  api.post(`/classes/class/${classId}/observations`, { contenu, eleve_id: eleveId }),
-  deleteObservation: (classId, observationId) =>
-  api.delete(`/classes/class/${classId}/observations/${observationId}`),
-};
-export const observationAPI = {
-  getUnread: () => api.get('/observations/non-lues'),
-  markAsRead: () => api.put('/observations/marquer-lues'),
-};
-export const studentAPI = {
-  getByClass: (classId) => api.get(`/students/class/${classId}`),
-  getByCollege: (collegeId) => api.get(`/students/college/${collegeId}`),
-  getById: (studentId) => api.get(`/students/${studentId}`),
-  create: (classId, data, photo) => {
-    const formData = new FormData();
-    Object.keys(data).forEach((k) => formData.append(k, data[k]));
-    if (photo) formData.append('photo', photo);
-    return api.post(`/students/${classId}/students`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-  update: (studentId, data) => api.put(`/students/${studentId}`, data),
-  updatePhoto: (studentId, photo) => {
-    const formData = new FormData();
-    formData.append('photo', photo);
-    return api.put(`/students/${studentId}/photo`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-  delete: (studentId) => api.delete(`/students/${studentId}`),
-};
-
-export const importAPI = {
-  validateExcel: (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post('/students/import/validate', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-  importStudents: (classId, students) => api.post(`/students/${classId}/import`, { students }),
-  downloadTemplate: () => api.get('/students/import/template', { responseType: 'blob' }),
-};
 export const assistanceAPI = {
   send: (data) => api.post('/assistance/send', data),
 };

@@ -27,10 +27,11 @@ planId: randomUUID(),
     await query(
       `INSERT INTO annees_scolaires
         (id, libelle, date_debut, date_fin, statut)
-       VALUES ($1, $2, '2026-09-01', '2027-07-31', 'active')`,
+       VALUES ($1, $2, '2026-09-01', '2027-07-31', 'active')
+       ON CONFLICT DO NOTHING`,
      [ids.createdYearId, `TEST-${token}`]
    );
-   activeYear = { rows: [{ id: ids.createdYearId }] };
+   activeYear = await query("SELECT id FROM annees_scolaires WHERE statut = 'active' LIMIT 1");
  }
 
  ids.yearId = activeYear.rows[0].id;
@@ -53,10 +54,16 @@ planId: randomUUID(),
     [ids.cycleId, `TEST-INT-${token}`]
   );
 
+ const niveau = await query(
+   `INSERT INTO niveaux_scolaires (cycle_id, code, libelle, ordre)
+    VALUES ($1, '6e', '6e', 10) RETURNING id`,
+    [ids.cycleId]
+ );
+
  await query(
-   `INSERT INTO classes (id, cycle_id, nom, ordre, niveau_code)
-    VALUES ($1, $2, '6e', 10, '6e')`,
-    [ids.classId, ids.cycleId]
+   `INSERT INTO classes (id, cycle_id, niveau_id, nom, ordre)
+    VALUES ($1, $2, $3, '6e', 10)`,
+    [ids.classId, ids.cycleId, niveau.rows[0].id]
  );
 
  const division = `T${token}`;
@@ -168,9 +175,8 @@ planId: randomUUID(),
      await query('DELETE FROM sites WHERE id = $1', [ids.siteId]);
     await query('DELETE FROM users WHERE id = $1', [ids.userId]);
 
-   if (ids.createdYearId) {
-        await query('DELETE FROM annees_scolaires WHERE id = $1', [ids.createdYearId]);
-     }
+   // L'année peut être réutilisée par une autre suite lancée en parallèle.
+   // Les inscriptions historiques la rendent volontairement non supprimable.
    },
   };
 };

@@ -19,10 +19,20 @@ export const getPlatformOverview = async (_req, res, next) => {
 };
 
 export const createPlatformSite = async (req, res, next) => {
+  let site = null;
   try {
     if (!req.body.nom?.trim()) return res.status(400).json({ error: 'Le nom du site est requis.' });
-    res.status(201).json({ site: await Establishment.createSite(req.body) });
-  } catch (error) { next(error); }
+    site = await Establishment.createSite(req.body);
+    const credentials = ['secretaire', 'comptable', 'censeur'].map((role) => ({ role, password: crypto.randomBytes(10).toString('base64url') }));
+    const comptes = await User.createSiteManagementAccounts({ siteId: site.id, siteNom: site.nom, credentials });
+    const identifiantsFiliale = comptes.map((c, i) => ({ role: c.role, username: c.username, password: credentials[i].password }));
+    res.status(201).json({ site, comptes, identifiantsFiliale });
+  } catch (error) {
+    if (site?.id) {
+      try { await Establishment.deleteSite(site.id); } catch (cleanupError) { error.cleanupError = cleanupError.message; }
+    }
+    next(error);
+  }
 };
 
 export const initializePlatform = async (req, res, next) => {
@@ -35,9 +45,16 @@ export const initializePlatform = async (req, res, next) => {
     const primaryData = cleanSites[0] || { nom };
     const site = await Establishment.createPrimarySite(primaryData);
     const secondarySites = [];
-    for (const siteData of cleanSites.slice(1)) secondarySites.push(await Establishment.createSite(siteData));
+    const identifiantsFiliales = [];
+    for (const siteData of cleanSites.slice(1)) {
+      const secondarySite = await Establishment.createSite(siteData);
+      const credentials = ['secretaire', 'comptable', 'censeur'].map((role) => ({ role, password: crypto.randomBytes(10).toString('base64url') }));
+      const comptesFiliale = await User.createSiteManagementAccounts({ siteId: secondarySite.id, siteNom: secondarySite.nom, credentials });
+      secondarySites.push(secondarySite);
+      identifiantsFiliales.push({ site: secondarySite.nom, siteId: secondarySite.id, identifiants: comptesFiliale.map((account, index) => ({ role: account.role, username: account.username, password: credentials[index].password })) });
+    }
     const credentials = MANAGEMENT_ROLES.map((role) => ({ role, password: crypto.randomBytes(10).toString('base64url') }));
     const comptes = await User.createDefaultManagementAccounts({ credentials });
-    res.status(201).json({ etablissement, site, sites: [site, ...secondarySites], comptes, identifiantsInitiaux: credentials });
+    res.status(201).json({ etablissement, site, sites: [site, ...secondarySites], comptes, identifiantsInitiaux: credentials, identifiantsFiliales });
   } catch (error) { next(error); }
 };

@@ -3,10 +3,48 @@ import { pool, query } from '../config/database.js';
 
 export class Establishment {
   static async get() { const result = await query('SELECT * FROM etablissement WHERE singleton = true'); return result.rows[0] || null; }
-  static async create({ nom, type, commune, departement, email, telephone, adressePostale }) {
-    const result = await query(`INSERT INTO etablissement (id, nom, type, commune, departement, email, telephone, adresse_postale) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`, [randomUUID(), nom.trim(), type || 'college', commune?.trim() || null, departement?.trim() || null, email?.trim().toLowerCase() || null, telephone?.trim() || null, adressePostale?.trim() || null]);
-    return result.rows[0];
+  static async findById(id) { const result = await query('SELECT * FROM etablissement WHERE id = $1', [id]); return result.rows[0] || null; }
+static async create({ nom, type, commune, departement, email, telephone, adressePostale }) {
+  const normalizedType = type;
+  if (!['primaire', 'college'].includes(normalizedType)) {
+    throw Object.assign(new Error('Le type d’établissement doit être primaire ou college.'), { status: 400, expose: true });
   }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(`INSERT INTO etablissement (id, nom, type, commune, departement, email, telephone, adresse_postale) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`, [randomUUID(), nom.trim(), normalizedType, commune?.trim() || null, departement?.trim() || null, email?.trim().toLowerCase() || null, telephone?.trim() || null, adressePostale?.trim() || null]);
+    const etablissement = result.rows[0];
+    await this.createDefaultCycles(client, etablissement.type);
+    await client.query('COMMIT');
+    return etablissement;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+static async createDefaultCycles(client, type) {
+  const cycles = type === 'primaire'
+    ? [{ nom: 'Primaire', ordre: 1, type_division: 'groupe', niveaux: [
+        ['CI', 'CI'], ['CP', 'CP'], ['CE1', 'CE1'], ['CE2', 'CE2'], ['CM1', 'CM1'], ['CM2', 'CM2'],
+      ] }]
+    : [
+        { nom: 'Premier cycle', ordre: 1, type_division: 'groupe', niveaux: [
+          ['6e', '6e'], ['5e', '5e'], ['4e', '4e'], ['3e', '3e'],
+        ] },
+        { nom: 'Second cycle', ordre: 2, type_division: 'serie', niveaux: [
+          ['2nde', '2nde'], ['1ere', '1ère'], ['terminale', 'Terminale'],
+        ] },
+      ];
+  for (const cycle of cycles) {
+    const createdCycle = await client.query('INSERT INTO cycles (nom, ordre, type_division) VALUES ($1, $2, $3) RETURNING id', [cycle.nom, cycle.ordre, cycle.type_division]);
+    for (const [index, [code, libelle]] of cycle.niveaux.entries()) {
+      await client.query('INSERT INTO niveaux_scolaires (cycle_id, code, libelle, ordre) VALUES ($1, $2, $3, $4)', [createdCycle.rows[0].id, code, libelle, index + 1]);
+    }
+  }
+}
   static async createPrimarySite({ nom, adresse, commune, departement, telephone, email }) {
     const result = await query(`INSERT INTO sites (nom, est_principal, adresse, commune, departement, telephone, email) VALUES ($1, true, $2, $3, $4, $5, $6) RETURNING *`, [nom.trim(), adresse?.trim() || null, commune?.trim() || null, departement?.trim() || null, telephone?.trim() || null, email?.trim().toLowerCase() || null]);
     return result.rows[0];
@@ -15,6 +53,9 @@ export class Establishment {
     const result = await query(`INSERT INTO sites (nom, adresse, commune, departement, telephone, email)
       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, [nom.trim(), adresse?.trim() || null, commune?.trim() || null, departement?.trim() || null, telephone?.trim() || null, email?.trim().toLowerCase() || null]);
     return result.rows[0];
+  }
+  static async deleteSite(id) {
+    await query('DELETE FROM sites WHERE id = $1 AND est_principal = false', [id]);
   }
     static async createSchoolYear({ libelle, moisDebut, moisFin }) {
     const debut = `${moisDebut}-01`;
@@ -66,6 +107,13 @@ export class Establishment {
       if (!draft.rowCount) {
         await client.query('ROLLBACK');
         return null;
+      }
+      const outgoing = await client.query("SELECT id FROM annees_scolaires WHERE statut = 'active'");
+      if (outgoing.rowCount) {
+        await client.query(
+          "UPDATE inscriptions SET statut = 'terminee', updated_at = CURRENT_TIMESTAMP WHERE annee_scolaire_id = $1 AND statut = 'active'",
+          [outgoing.rows[0].id]
+        );
       }
       await client.query("UPDATE annees_scolaires SET statut = 'archivee', cloturee_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE statut = 'active'");
       const result = await client.query("UPDATE annees_scolaires SET statut = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *", [id]);

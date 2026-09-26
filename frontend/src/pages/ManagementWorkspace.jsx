@@ -7,9 +7,11 @@ const workspaceMeta = {
   censeur: { title: 'Censeur', subtitle: 'Suivi des élèves, classes et équipes pédagogiques', icon: <ShieldCheck className="h-5 w-5" />, menu: [{ id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> }, { id: 'classes', label: 'Classes et élèves', icon: <Users className="h-4 w-4" /> }, { id: 'pedagogie', label: 'Équipe pédagogique', icon: <UsersRound className="h-4 w-4" /> }, { id: 'assistance', label: 'Assistance', icon: <LifeBuoy className="h-4 w-4" /> }, { id: 'profil', label: 'Profil', icon: <UserRound className="h-4 w-4" /> }, { id: 'securite', label: 'Sécurité', icon: <KeyRound className="h-4 w-4" /> }] },
 };
 
-export default function ManagementWorkspace({ role, user, establishmentName, section, setSection, onLogout, content, error, notice }) {
+export default function ManagementWorkspace({ role, user, cardService, establishmentName, section, setSection, onLogout, content, error, notice }) {
   const meta = workspaceMeta[role];
-  const menu = meta?.menu || [];
+  const menu = role === 'secretaire' && cardService?.actif
+    ? [...(meta?.menu || []), { id: 'cartes', label: 'Cartes FVS', icon: <Users className="h-4 w-4" /> }]
+    : (meta?.menu || []);
   return (
   <div className="h-screen overflow-hidden bg-[#f7faf8] text-slate-900 flex">
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">

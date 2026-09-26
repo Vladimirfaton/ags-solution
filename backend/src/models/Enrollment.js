@@ -1,6 +1,7 @@
 import { pool, query } from '../config/database.js';
 import { FinancialObligation } from './FinancialObligation.js';
 import { resolveScopedSite } from './AccessScope.js';
+import { allowedLevelCodes } from '../utils/establishmentType.js';
 
 export class Enrollment {
 static async options(scope, requestedSiteId) {
@@ -9,6 +10,8 @@ static async options(scope, requestedSiteId) {
      resolveScopedSite(scope, requestedSiteId),
    ]);
    if (!year.rowCount) return { year: null, students: [], classes: [] };
+   const establishment = await query('SELECT type FROM etablissement WHERE singleton = true');
+   const levels = allowedLevelCodes(establishment.rows[0]?.type);
 const studentsQuery = scope.allSites
      ? query(`SELECT e.id, e.matricule, e.nom, e.prenom
          FROM eleves e
@@ -34,11 +37,42 @@ const studentsQuery = scope.allSites
        query(`SELECT ca.id, ca.code_affichage
        FROM classes_annuelles ca
        JOIN classes c ON c.id = ca.classe_id
-        JOIN niveaux_scolaires n ON n.code = c.niveau_code
-       WHERE ca.annee_scolaire_id = $1 AND ca.site_id = $2 AND ca.actif = true
-        ORDER BY n.ordre, ca.division_nom`, [year.rows[0].id, siteId]),
+        JOIN niveaux_scolaires n ON n.id = c.niveau_id
+       WHERE ca.annee_scolaire_id = $1 AND ca.site_id = $2 AND ca.actif = true AND n.code = ANY($3::text[])
+        ORDER BY n.ordre, ca.division_nom`, [year.rows[0].id, siteId, levels]),
     ]);
    return { year: year.rows[0], siteId, students: students.rows, classes: classes.rows };
+  }
+  static async classesForStudent(studentId, scope) {
+    const establishment = await query('SELECT type FROM etablissement WHERE singleton = true');
+    const levels = allowedLevelCodes(establishment.rows[0]?.type);
+    const siteFilter = scope.allSites ? '' : ' AND ca.site_id = ANY($2::uuid[])';
+    const result = await query(`WITH derniere AS (
+        SELECT ca.site_id, n.ordre
+        FROM inscriptions i
+        JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+        JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+        JOIN classes c ON c.id = ca.classe_id
+        JOIN niveaux_scolaires n ON n.id = c.niveau_id
+        WHERE i.eleve_id = $1
+        ORDER BY i.date_inscription DESC
+        LIMIT 1
+      ),
+      niveau_suivant AS (
+        SELECT MIN(ordre) AS ordre FROM niveaux_scolaires WHERE ordre > (SELECT ordre FROM derniere)
+      )
+      SELECT ca.id, ca.code_affichage, n.ordre
+      FROM classes_annuelles ca
+      JOIN classes c ON c.id = ca.classe_id
+      JOIN niveaux_scolaires n ON n.id = c.niveau_id
+      JOIN derniere d ON ca.site_id = d.site_id
+      WHERE ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
+        AND ca.actif = true
+        AND n.code = ANY($${scope.allSites ? 2 : 3}::text[])
+        AND (n.ordre = d.ordre OR n.ordre = (SELECT ordre FROM niveau_suivant))${siteFilter}
+      ORDER BY n.ordre, ca.division_nom`,
+    scope.allSites ? [studentId, levels] : [studentId, scope.siteIds, levels]);
+    return result.rows;
   }
     static async create({ studentId, annualClassId, siteId: requestedSiteId, paidFeeConfigIds }, userId, scope) {
     const client = await pool.connect();
