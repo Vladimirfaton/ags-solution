@@ -50,7 +50,7 @@ export class FinancialConfiguration {
     };
   }
 
-  static async save({ fees = [], plans = [] }, scope, requestedSiteId = null) {
+  static async save({ fees = [], tranches = [], plans = [] }, scope, requestedSiteId = null) {
   const context = await this.get(scope, requestedSiteId);
     if (!context.year || !context.site) throw Object.assign(new Error('Configurez une année scolaire active et un site principal.'), { status: 400, expose: true });
 
@@ -95,13 +95,17 @@ export class FinancialConfiguration {
         }
         planIds.push(planId);
         const trancheIds = [];
-        for (const tranche of plan.tranches || []) {
+        for (const [trancheIndex, tranche] of (plan.tranches || []).entries()) {
+          const echeance = tranches[trancheIndex] || tranche;
+          const echeanceNom = echeance?.nom || echeance?.tranche_nom;
+          const echeanceDate = echeance?.dateEcheance || echeance?.date_echeance;
+          if (!echeanceNom || !echeanceDate) throw Object.assign(new Error(`Échéance de la tranche ${trancheIndex + 1} manquante pour le tarif.`), { status: 400, expose: true });
           if (tranche.id) {
-            const result = await client.query(`UPDATE tranches_tarifaires SET ordre = $1, nom = $2, montant = $3, date_echeance = $4, actif = $5 WHERE id = $6 AND plan_tarifaire_id = $7 RETURNING id`, [Number(tranche.ordre), tranche.nom.trim(), normalizeMoney(tranche.montant), tranche.dateEcheance, Boolean(tranche.actif ?? true), tranche.id, planId]);
+            const result = await client.query(`UPDATE tranches_tarifaires SET ordre = $1, nom = $2, montant = $3, date_echeance = $4, actif = $5 WHERE id = $6 AND plan_tarifaire_id = $7 RETURNING id`, [Number(echeance.ordre || trancheIndex + 1), echeanceNom.trim(), normalizeMoney(tranche.montant), echeanceDate, Boolean(tranche.actif ?? true), tranche.id, planId]);
             if (!result.rowCount) throw Object.assign(new Error('Tranche introuvable pour ce tarif.'), { status: 400, expose: true });
             trancheIds.push(tranche.id);
           } else {
-            const result = await client.query(`INSERT INTO tranches_tarifaires (plan_tarifaire_id, ordre, nom, montant, date_echeance, actif) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`, [planId, Number(tranche.ordre), tranche.nom.trim(), normalizeMoney(tranche.montant), tranche.dateEcheance, Boolean(tranche.actif ?? true)]);
+            const result = await client.query(`INSERT INTO tranches_tarifaires (plan_tarifaire_id, ordre, nom, montant, date_echeance, actif) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`, [planId, Number(echeance.ordre || trancheIndex + 1), echeanceNom.trim(), normalizeMoney(tranche.montant), echeanceDate, Boolean(tranche.actif ?? true)]);
             trancheIds.push(result.rows[0].id);
           }
         }

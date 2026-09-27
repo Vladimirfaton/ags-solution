@@ -56,22 +56,26 @@ export const listArchivedClassStudents = async (req, res, next) => {
 
 export const saveFinancialConfiguration = async (req, res, next) => {
   try {
-    const { fees = [], plans = [] } = req.body;
+    const { fees = [], tranches = [], plans = [] } = req.body;
     if (!Array.isArray(fees) || !Array.isArray(plans)) return res.status(400).json({ error: 'La configuration financière est invalide.' });
     for (const fee of fees) {
       if (!fee.nom?.trim() || !Number.isFinite(Number(fee.montant)) || Number(fee.montant) < 0) return res.status(400).json({ error: 'Chaque frais doit avoir un nom et un montant valide.' });
       if (!['inscription', 'reinscription', 'les_deux'].includes(fee.applicableA)) return res.status(400).json({ error: 'La règle d’application du frais est invalide.' });
     }
+    const today = new Date().toISOString().slice(0, 10);
+    if (!Array.isArray(tranches) || !tranches.length || tranches.some((tranche, index) => !tranche.nom?.trim() || !tranche.dateEcheance || tranche.dateEcheance < today || (index > 0 && tranche.dateEcheance < tranches[index - 1].dateEcheance))) {
+      return res.status(400).json({ error: 'Les échéances doivent être renseignées, à partir d’aujourd’hui et dans l’ordre des tranches.' });
+    }
     for (const plan of plans) {
       if (!plan.classeAnnuelleId || !Number.isFinite(Number(plan.montantTotal)) || Number(plan.montantTotal) <= 0) return res.status(400).json({ error: 'Chaque tarif doit avoir un montant strictement positif.' });
-      const tranches = plan.tranches || [];
-      const totalTranches = tranches.reduce((total, tranche) => total + Number(tranche.montant), 0);
-      if (!tranches.length || tranches.some((tranche) => !tranche.nom?.trim() || !tranche.dateEcheance || !Number.isFinite(Number(tranche.montant)) || Number(tranche.montant) <= 0) || Math.round(totalTranches * 100) !== Math.round(Number(plan.montantTotal) * 100)) {
+      const planTranches = plan.tranches || [];
+      const totalTranches = planTranches.reduce((total, tranche) => total + Number(tranche.montant), 0);
+      if (planTranches.length !== tranches.length || planTranches.some((tranche) => !Number.isFinite(Number(tranche.montant)) || Number(tranche.montant) <= 0) || Math.round(totalTranches * 100) !== Math.round(Number(plan.montantTotal) * 100)) {
         return res.status(400).json({ error: 'Les tranches doivent être valides et leur total doit correspondre au tarif de la classe.' });
       }
     }
     res.json(await FinancialConfiguration.save(
-     { fees, plans },
+     { fees, tranches, plans },
       await accessScopeFor(req.user),
       req.body.siteId
     ));

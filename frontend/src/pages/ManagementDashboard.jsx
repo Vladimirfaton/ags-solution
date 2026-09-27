@@ -98,7 +98,7 @@ function RoleContent(props) { if (props.section === 'cartes') return <CardServic
 ) : props.role === 'censeur' ? (props.section === 'classes' ? <ClassRegistry {...props}/> : props.section === 'pedagogie' ? <CenseurPedagogy establishmentType={props.establishmentType}/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <Monitoring {...props}/>) : null; return view; }
 function Sites({ direction, siteForm, setSiteForm, createSite }) { const set = (key) => (event) => setSiteForm({ ...siteForm, [key]: event.target.value }); return <><Title title="Sites et filiales" subtitle="Le site principal est créé à l�?Tinstallation. Ajoutez une filiale seulement si elle partage le même établissement."/><div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">{direction?.sites?.map((site) => <Card key={site.id} icon={<MapPin/>} label={site.est_principal ? 'Site principal' : 'Filiale'} value={site.nom}><p className="text-xs text-slate-500 mt-3">{site.classes_count} classe(s) · {site.students_count} élève(s)</p></Card>)}</div><Panel title="Ajouter un site"><form onSubmit={createSite} className="grid sm:grid-cols-2 gap-3"><Input label="Nom du site" value={siteForm.nom} onChange={set('nom')} required/><Input label="Téléphone" value={siteForm.telephone} onChange={set('telephone')}/><Input label="Adresse" value={siteForm.adresse} onChange={set('adresse')}/><Input label="Commune" value={siteForm.commune} onChange={set('commune')}/><Input label="Département" value={siteForm.departement} onChange={set('departement')}/><Input label="Email" type="email" value={siteForm.email} onChange={set('email')}/><button className="sm:col-span-2 primary flex items-center justify-center gap-2"><Plus className="w-4"/>Créer le site</button></form></Panel></>; }
 function FinanceSettings({ finance, saveFinancialConfiguration, establishmentType }) {
-  const [draft, setDraft] = useState({ fees: [], plans: [] });
+  const [draft, setDraft] = useState({ fees: [], tranches: [], plans: [] });
   const [mode, setMode] = useState('view');
   const [classSearch, setClassSearch] = useState('');
 
@@ -109,17 +109,18 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
       classeAnnuelleId: annualClass.id,
       label: annualClass.code_affichage,
       montantTotal: annualClass.plan ? String(annualClass.plan.montant_total) : '',
-      tranches: annualClass.plan?.tranches?.map((tranche) => ({ ...tranche, montant: String(tranche.montant), dateEcheance: tranche.date_echeance?.slice(0, 10) || '' })) || [],
+      tranches: annualClass.plan?.tranches?.map((tranche) => ({ ...tranche, montant: String(tranche.montant) })) || [],
     }));
-    setDraft({ fees, plans });
+    const sourceTranches = plans.find((plan) => plan.tranches.length)?.tranches || [];
+    setDraft({ fees, tranches: sourceTranches.map(({ id, montant, ...tranche }) => ({ ...tranche, dateEcheance: tranche.date_echeance?.slice(0, 10) || '' })), plans });
     setMode(fees.length > 0 || plans.some((p) => p.montantTotal) ? 'view' : 'edit');
   }, [finance]);
 
   const setFee = (index, key, value) => setDraft({ ...draft, fees: draft.fees.map((fee, current) => current === index ? { ...fee, [key]: value } : fee) });
   const setPlan = (index, key, value) => setDraft({ ...draft, plans: draft.plans.map((plan, current) => current === index ? { ...plan, [key]: value } : plan) });
-  const setTranche = (planIndex, trancheIndex, key, value) => setDraft({ ...draft, plans: draft.plans.map((plan, current) => current !== planIndex ? plan : { ...plan, tranches: plan.tranches.map((tranche, trancheCurrent) => trancheCurrent === trancheIndex ? { ...tranche, [key]: value } : tranche) }) });
+  const setTranche = (trancheIndex, key, value) => setDraft({ ...draft, tranches: draft.tranches.map((tranche, current) => current === trancheIndex ? { ...tranche, [key]: value } : tranche) });
   const addFee = () => setDraft({ ...draft, fees: [...draft.fees, { nom: '', montant: '', applicableA: 'les_deux', obligatoire: true, ordre: draft.fees.length, actif: true }] });
-  const addTranche = (planIndex) => setDraft({ ...draft, plans: draft.plans.map((plan, current) => current !== planIndex ? plan : { ...plan, tranches: [...plan.tranches, { nom: `Tranche ${plan.tranches.length + 1}`, montant: '', dateEcheance: '', ordre: plan.tranches.length + 1, actif: true }] }) });
+  const addTranche = () => setDraft({ ...draft, tranches: [...draft.tranches, { nom: `Tranche ${draft.tranches.length + 1}`, dateEcheance: '', ordre: draft.tranches.length + 1, actif: true }], plans: draft.plans.map((plan) => ({ ...plan, tranches: [...plan.tranches, { montant: '' }] })) });
   const trancheSum = (plan) => plan.tranches.reduce((sum, t) => sum + Number(t.montant || 0), 0);
     const levelOf = (label) => label.trim().split(/[-\s]/)[0];
   const divisionOf = (label) => label.trim().split(/[-\s]/).slice(1).join(' ');
@@ -129,12 +130,26 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
     setDraft({ ...draft, plans: draft.plans.map((plan) => plan === source || levelOf(plan.label) !== level ? plan : { ...plan, montantTotal: source.montantTotal, tranches: source.tranches.map(({ id, ...rest }) => ({ ...rest })) }) });
   };
 
-  const submit = (event) => { event.preventDefault(); saveFinancialConfiguration({ fees: draft.fees, plans: draft.plans }); setMode('view'); };
+  const submit = (event) => {
+    event.preventDefault();
+    const sharedTranches = draft.tranches.map((tranche, index) => ({
+      nom: tranche.nom,
+      dateEcheance: tranche.dateEcheance || tranche.date_echeance,
+      ordre: Number(tranche.ordre || index + 1),
+      actif: Boolean(tranche.actif ?? true),
+    }));
+    const plans = draft.plans.map((plan) => ({
+      ...plan,
+      tranches: plan.tranches.map((tranche) => ({ id: tranche.id, montant: tranche.montant, actif: Boolean(tranche.actif ?? true) })),
+    }));
+    saveFinancialConfiguration({ fees: draft.fees, tranches: sharedTranches, plans });
+    setMode('view');
+  };
 
   if (!finance?.year) return <><Title title="Paramètres financiers" subtitle="Configurez les frais et tarifs de l'année active"/><Empty>Activez d'abord une année scolaire.</Empty></>;
 
     if (mode === 'view') {
-    const planSignature = (plan) => JSON.stringify({ total: plan.montantTotal, tranches: plan.tranches.map((t) => ({ nom: t.nom, montant: t.montant, dateEcheance: t.dateEcheance })) });
+    const planSignature = (plan) => JSON.stringify({ total: plan.montantTotal, tranches: plan.tranches.map((t, index) => ({ nom: draft.tranches[index]?.nom, montant: t.montant, dateEcheance: draft.tranches[index]?.dateEcheance })) });
     const configuredPlans = draft.plans.filter((p) => p.montantTotal);
     const searchedPlans = classSearch.trim() ? configuredPlans.filter((p) => p.label.toLowerCase().includes(classSearch.trim().toLowerCase())) : configuredPlans;
     const byLevel = new Map();
@@ -261,14 +276,12 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
                     <Input label="Tarif annuel (F CFA)" type="number" min="0.01" step="0.01" value={plan.montantTotal} onChange={(event) => setPlan(planIndex, 'montantTotal', event.target.value)} required/>
                     <div className="mt-4 space-y-3">
                       {plan.tranches.map((tranche, trancheIndex) => (
-                        <div key={tranche.id || trancheIndex} className="grid grid-cols-3 gap-2">
-                          <Input label="Tranche" value={tranche.nom} onChange={(event) => setTranche(planIndex, trancheIndex, 'nom', event.target.value)} required/>
-                          <Input label="Montant" type="number" min="0.01" step="0.01" value={tranche.montant} onChange={(event) => setTranche(planIndex, trancheIndex, 'montant', event.target.value)} required/>
-                          <Input label="Échéance" type="date" value={tranche.dateEcheance} onChange={(event) => setTranche(planIndex, trancheIndex, 'dateEcheance', event.target.value)} required/>
+                        <div key={tranche.id || trancheIndex} className="grid grid-cols-2 gap-2">
+                          <Input label="Tranche" value={draft.tranches[trancheIndex]?.nom || `Tranche ${trancheIndex + 1}`} readOnly/>
+                          <Input label="Montant" type="number" min="0.01" step="0.01" value={tranche.montant} onChange={(event) => setPlan(planIndex, 'tranches', plan.tranches.map((item, current) => current === trancheIndex ? { ...item, montant: event.target.value } : item))} required/>
                         </div>
                       ))}
                     </div>
-                    <button type="button" onClick={() => addTranche(planIndex)} className="mt-3 text-sm font-semibold text-emerald-700">+ Ajouter une tranche</button>
                   </div>
                 );
                 })}
@@ -277,7 +290,16 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
           })()}
         </Panel>
 
-        <div className="flex gap-2">
+          <div className="mt-6 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+            <h4 className="font-semibold text-slate-800">Échéances communes à toutes les classes</h4>
+            <p className="mt-1 text-xs text-slate-500">Saisissez chaque date une seule fois. Les dates doivent être à partir d’aujourd’hui et suivre l’ordre des tranches.</p>
+            <div className="mt-3 space-y-2">
+              {draft.tranches.map((tranche, index) => <div key={index} className="grid grid-cols-2 gap-2"><Input label="Tranche" value={tranche.nom} onChange={(event) => setTranche(index, 'nom', event.target.value)} required/><Input label="Échéance" type="date" min={new Date().toISOString().slice(0, 10)} value={tranche.dateEcheance} onChange={(event) => setTranche(index, 'dateEcheance', event.target.value)} required/></div>)}
+            </div>
+            <button type="button" onClick={addTranche} className="mt-3 text-sm font-semibold text-emerald-700">+ Ajouter une tranche</button>
+          </div>
+
+          <div className="flex gap-2">
           <button className="primary">Enregistrer la configuration</button>
           <button type="button" onClick={() => setMode('view')} className="rounded-lg bg-slate-100 px-4 py-2.5 text-sm text-slate-700">Annuler</button>
         </div>

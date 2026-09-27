@@ -125,7 +125,11 @@ const parseWorkbook = async (buffer) => {
   if (!buffer?.length) fail('Le fichier Excel est requis.');
 
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  try {
+    await workbook.xlsx.load(buffer);
+  } catch {
+    fail('Le fichier Excel est invalide ou endommagé. Utilisez un fichier .xlsx valide.');
+  }
 
   const worksheet = workbook.worksheets[0];
   if (!worksheet) fail('Le fichier ne contient aucune feuille.');
