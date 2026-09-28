@@ -1,10 +1,14 @@
-import { Building2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, UserRound } from 'lucide-react';
+import { Building2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Search, UserRound } from 'lucide-react';
 import { PLATFORM_NAME } from '../config/branding';
+import { directionAPI } from '../services/api';
 import DirectorCockpit from './DirectorCockpit';
+import EstablishmentStudentsPanel from './EstablishmentStudentsPanel';
 
 export default function DirectorWorkspace({ user, establishmentName, onLogout, section, setSection, cockpitProps, content, error, notice }) {
+  const sites = cockpitProps?.direction?.sites || [];
   const navigation = [
     { id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> },
+    { id: 'recherche-eleve', label: 'Rechercher un élève', icon: <Search className="h-4 w-4" /> },
     { id: 'cartes', label: 'Cartes FVS', icon: <Building2 className="h-4 w-4" /> },
     { id: 'profil', label: 'Mon profil', icon: <UserRound className="h-4 w-4" /> },
     { id: 'securite', label: 'Sécurité', icon: <KeyRound className="h-4 w-4" /> },
@@ -76,7 +80,7 @@ export default function DirectorWorkspace({ user, establishmentName, onLogout, s
             </div>
           )}
 
-          {section === 'tableau' ? <DirectorCockpit {...cockpitProps} /> : content}
+          {section === 'tableau' ? <DirectorCockpit {...cockpitProps} /> : section === 'recherche-eleve' ? <div className="space-y-6"><div><h2 className="text-2xl font-semibold tracking-tight text-emerald-700">Rechercher un élève</h2><p className="mt-1 text-sm text-slate-500">Chaque site dispose de sa propre recherche et de sa pagination.</p></div>{sites.map((site) => <EstablishmentStudentsPanel key={site.id} title={site.nom} subtitle={`${site.est_principal ? 'Site principal' : 'Filiale'} · Recherche des élèves de ce site uniquement.`} fetchStudents={(search, page) => directionAPI.listStudents(search, page, site.id)} />)}</div> : content}
         </div>
       </div>
     </main>

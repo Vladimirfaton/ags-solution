@@ -136,8 +136,11 @@ export class StudentRegistry {
       throw error;
     } finally { client.release(); }
   } 
-    static async listForEstablishment(search = '', scope, page = 1, pageSize = 10) {
+    static async listForEstablishment(search = '', scope, page = 1, pageSize = 10, siteId = null) {
     const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
+    const requestedSiteFilter = siteId && scope.allSites ? { sql: ' AND ca.site_id = $2', params: [siteId] } : { sql: '', params: [] };
+    const effectiveFilter = requestedSiteFilter.sql || siteFilter.sql;
+    const effectiveParams = requestedSiteFilter.params.length ? requestedSiteFilter.params : siteFilter.params;
     const term = `%${search.trim()}%`;
     const offset = (Math.max(1, page) - 1) * pageSize;
     const [rows, count] = await Promise.all([
@@ -149,17 +152,17 @@ export class StudentRegistry {
         JOIN classes c ON c.id = ca.classe_id
         JOIN niveaux_scolaires n ON n.id = c.niveau_id
         JOIN sites s ON s.id = ca.site_id
-        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${siteFilter.sql}
+        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${effectiveFilter}
         ORDER BY n.ordre, ca.division_nom, e.nom, e.prenom
-        LIMIT $${siteFilter.params.length + 2} OFFSET $${siteFilter.params.length + 3}`,
-        [term, ...siteFilter.params, pageSize, offset]),
+        LIMIT $${effectiveParams.length + 2} OFFSET $${effectiveParams.length + 3}`,
+        [term, ...effectiveParams, pageSize, offset]),
       query(`SELECT COUNT(*)::int AS total
         FROM eleves e
         JOIN inscriptions i ON i.eleve_id = e.id AND i.statut = 'active' AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
         JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
         JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
-        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${siteFilter.sql}`,
-        [term, ...siteFilter.params]),
+        WHERE (e.matricule ILIKE $1 OR e.nom ILIKE $1 OR e.prenom ILIKE $1 OR ca.code_affichage ILIKE $1)${effectiveFilter}`,
+        [term, ...effectiveParams]),
     ]);
     return { students: rows.rows, total: count.rows[0].total, page, pageSize };
   }

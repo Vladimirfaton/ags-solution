@@ -1,5 +1,4 @@
 import { Building2, CalendarDays, IdCard, MapPin, School, Users } from 'lucide-react';
-import EstablishmentStudentsPanel from './EstablishmentStudentsPanel';
 import SchoolYearPanel, { YearArchives } from './SchoolYearPanel';
 const formatNumber = (value) => Number(value || 0).toLocaleString('fr-FR');
 const classRank = (value = '') => {
@@ -42,6 +41,7 @@ const sortClasses = (classes = []) => [...classes].sort((a, b) => {
 export default function DirectorCockpit({ direction, schoolYears = [], yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear, loadClass }) {
   const sites = direction?.sites || [];
   const classes = sortClasses(direction?.classes || []);
+  const classesBySite = sites.map((site) => ({ site, classes: classes.filter((item) => item.site_id === site.id || item.site_nom === site.nom) }));
   const totalStudents = sites.reduce((sum, site) => sum + Number(site.students_count || 0), 0);
 
   return (
@@ -92,17 +92,13 @@ export default function DirectorCockpit({ direction, schoolYears = [], yearForm,
               </div>
               <span className="text-xs font-semibold text-slate-400">{classes.length} active(s)</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {classes.length ? classes.map((item) => (
+            {classesBySite.length ? classesBySite.map(({ site, classes: siteClasses }) => <div key={site.id} className="mb-4 last:mb-0 rounded-xl border border-slate-200 p-3"><div className="mb-3 flex items-center justify-between"><p className="text-sm font-semibold text-slate-800">{site.nom}</p><span className="text-xs text-slate-400">{siteClasses.length} classe(s)</span></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{siteClasses.length ? siteClasses.map((item) => (
               <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
                 <p className="font-semibold text-slate-800">{item.code_affichage}</p>
                 <p className="mt-2 text-xs text-slate-500">{formatNumber(item.effectif)} élève(s)</p>
-                <p className="mt-3 text-[11px] text-slate-400">{item.site_nom || 'Site principal'}</p>
               </div>
-              )) : <EmptyState>Aucune classe active pour le moment.</EmptyState>}
-            </div>
+              )) : <p className="col-span-full text-xs text-slate-500">Aucune classe active sur ce site.</p>}</div></div>) : <EmptyState>Aucune classe active pour le moment.</EmptyState>}
           </section>
-          <EstablishmentStudentsPanel />
           <YearArchives schoolYears={schoolYears} />
         </div>
 

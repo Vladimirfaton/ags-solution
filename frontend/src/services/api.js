@@ -84,7 +84,7 @@ export const directionAPI = {
   createSchoolYear: ({ libelle, dateDebut, dateFin }) => api.post('/direction/annees-scolaires', { libelle, moisDebut: dateDebut?.slice(0, 7), moisFin: dateFin?.slice(0, 7) }),
   listYearClasses: (id) => api.get(`/direction/annees-scolaires/${id}/classes`),
   listArchivedClassStudents: (classId) => api.get(`/direction/archives/classes/${classId}/eleves`),
-listStudents: (search = '', page = 1) => api.get('/direction/eleves', { params: { recherche: search, page, pageSize: 10 } }),
+  listStudents: (search = '', page = 1, siteId = null) => api.get('/direction/eleves', { params: { recherche: search, page, pageSize: 10, ...(siteId ? { siteId } : {}) } }),
 };
 
 export const secretariatAPI = {

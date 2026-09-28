@@ -86,6 +86,6 @@ export const getEstablishmentStudents = async (req, res, next) => {
     const { StudentRegistry } = await import('../models/StudentRegistry.js');
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
-    res.json(await StudentRegistry.listForEstablishment(req.query.recherche || '', await accessScopeFor(req.user), page, pageSize));
+    res.json(await StudentRegistry.listForEstablishment(req.query.recherche || '', await accessScopeFor(req.user), page, pageSize, req.query.siteId || null));
   } catch (error) { next(error); }
 };

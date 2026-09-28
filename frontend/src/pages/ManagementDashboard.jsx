@@ -112,7 +112,12 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
       tranches: annualClass.plan?.tranches?.map((tranche) => ({ ...tranche, montant: String(tranche.montant) })) || [],
     }));
     const sourceTranches = plans.find((plan) => plan.tranches.length)?.tranches || [];
-    setDraft({ fees, tranches: sourceTranches.map(({ id, montant, ...tranche }) => ({ ...tranche, dateEcheance: tranche.date_echeance?.slice(0, 10) || '' })), plans });
+    const sharedTranches = sourceTranches.map(({ id, montant, ...tranche }) => ({ ...tranche, dateEcheance: tranche.date_echeance?.slice(0, 10) || '' }));
+    const normalizedPlans = plans.map((plan) => ({
+      ...plan,
+      tranches: plan.tranches.length ? plan.tranches : sharedTranches.map((tranche) => ({ nom: tranche.nom, ordre: tranche.ordre, montant: '', actif: true })),
+    }));
+    setDraft({ fees, tranches: sharedTranches, plans: normalizedPlans });
     setMode(fees.length > 0 || plans.some((p) => p.montantTotal) ? 'view' : 'edit');
   }, [finance]);
 
@@ -121,6 +126,7 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
   const setTranche = (trancheIndex, key, value) => setDraft({ ...draft, tranches: draft.tranches.map((tranche, current) => current === trancheIndex ? { ...tranche, [key]: value } : tranche) });
   const addFee = () => setDraft({ ...draft, fees: [...draft.fees, { nom: '', montant: '', applicableA: 'les_deux', obligatoire: true, ordre: draft.fees.length, actif: true }] });
   const addTranche = () => setDraft({ ...draft, tranches: [...draft.tranches, { nom: `Tranche ${draft.tranches.length + 1}`, dateEcheance: '', ordre: draft.tranches.length + 1, actif: true }], plans: draft.plans.map((plan) => ({ ...plan, tranches: [...plan.tranches, { montant: '' }] })) });
+  const removeTranche = (trancheIndex) => setDraft({ ...draft, tranches: draft.tranches.filter((_, index) => index !== trancheIndex).map((tranche, index) => ({ ...tranche, ordre: index + 1 })), plans: draft.plans.map((plan) => ({ ...plan, tranches: plan.tranches.filter((_, index) => index !== trancheIndex).map((tranche, index) => ({ ...tranche, ordre: index + 1 })) })) });
   const trancheSum = (plan) => plan.tranches.reduce((sum, t) => sum + Number(t.montant || 0), 0);
     const levelOf = (label) => label.trim().split(/[-\s]/)[0];
   const divisionOf = (label) => label.trim().split(/[-\s]/).slice(1).join(' ');
@@ -248,6 +254,14 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
         </Panel>
 
                   <Panel title="Tarifs par classe">
+          <div className="mb-6 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+            <h4 className="font-semibold text-slate-800">Échéances communes à toutes les classes</h4>
+            <p className="mt-1 text-xs text-slate-500">Définissez ici les tranches et leurs échéances une seule fois. Les montants seront saisis par classe ci-dessous.</p>
+            <div className="mt-3 space-y-2">
+              {draft.tranches.map((tranche, index) => <div key={index} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2"><Input label="Tranche" value={tranche.nom} onChange={(event) => setTranche(index, 'nom', event.target.value)} required/><Input label="Échéance" type="date" min={new Date().toISOString().slice(0, 10)} value={tranche.dateEcheance} onChange={(event) => setTranche(index, 'dateEcheance', event.target.value)} required/><button type="button" onClick={() => removeTranche(index)} className="mb-0.5 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50">Supprimer</button></div>)}
+            </div>
+            <button type="button" onClick={addTranche} className="mt-3 text-sm font-semibold text-emerald-700">+ Ajouter une tranche</button>
+          </div>
           <div className="relative mb-4">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"/>
             <input type="text" value={classSearch} onChange={(e) => setClassSearch(e.target.value)} placeholder={`Rechercher une classe (ex : ${establishmentType === 'primaire' ? 'CM2 A' : '6e, 2nde A'})`} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
@@ -290,7 +304,7 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
           })()}
         </Panel>
 
-          <div className="mt-6 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+          <div className="hidden">
             <h4 className="font-semibold text-slate-800">Échéances communes à toutes les classes</h4>
             <p className="mt-1 text-xs text-slate-500">Saisissez chaque date une seule fois. Les dates doivent être à partir d’aujourd’hui et suivre l’ordre des tranches.</p>
             <div className="mt-3 space-y-2">
