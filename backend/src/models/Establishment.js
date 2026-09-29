@@ -139,7 +139,7 @@ static async createDefaultCycles(client, type) {
   static async adminOverview() {
     const [etablissement, sites, comptes] = await Promise.all([
       this.get(),
-      query('SELECT id, nom, est_principal, actif, commune, departement FROM sites ORDER BY est_principal DESC, nom ASC'),
+      query("SELECT id, nom, est_principal, actif, commune, departement FROM sites WHERE actif = true AND nom NOT LIKE 'TEST-INT-%' ORDER BY est_principal DESC, nom ASC"),
       query("SELECT id, role, username, nom, prenom, status, password_personalized FROM users ORDER BY CASE role WHEN 'directeur' THEN 1 WHEN 'secretaire' THEN 2 WHEN 'comptable' THEN 3 WHEN 'censeur' THEN 4 END"),
     ]);
     return { etablissement, sites: sites.rows, comptes: comptes.rows };
@@ -148,21 +148,30 @@ static async createDefaultCycles(client, type) {
     const [etablissement, sites, anneeActive, comptes, classes] = await Promise.all([
       this.get(),
       query(`SELECT s.id, s.nom, s.est_principal, s.actif,
-        COUNT(DISTINCT ca.id)::int AS classes_count,
-        COUNT(DISTINCT i.eleve_id) FILTER (WHERE i.statut = 'active')::int AS students_count
+        COUNT(DISTINCT ca.id) FILTER (WHERE ca.actif = true)::int AS classes_count,
+        COUNT(DISTINCT i.eleve_id)::int AS students_count
         FROM sites s
         LEFT JOIN classes_annuelles ca ON ca.site_id = s.id
           AND ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
+          AND ca.actif = true
         LEFT JOIN inscriptions i ON i.site_id = s.id
           AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
+          AND i.statut = 'active'
+        WHERE s.actif = true AND s.nom NOT LIKE 'TEST-INT-%'
         GROUP BY s.id ORDER BY s.est_principal DESC, s.nom ASC`),
       query("SELECT id, libelle, date_debut, date_fin FROM annees_scolaires WHERE statut = 'active'"),
       query("SELECT id, role, username, nom, prenom, status, password_personalized FROM users ORDER BY CASE role WHEN 'directeur' THEN 1 WHEN 'secretaire' THEN 2 WHEN 'comptable' THEN 3 WHEN 'censeur' THEN 4 END"),
-      query(`SELECT ca.id, ca.code_affichage, s.nom AS site_nom, COUNT(ai.id)::int AS effectif
+      query(`SELECT ca.id, ca.code_affichage, ca.site_id, s.nom AS site_nom,
+        COUNT(DISTINCT i.eleve_id)::int AS effectif
         FROM classes_annuelles ca
         JOIN sites s ON s.id = ca.site_id
         LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true
+        LEFT JOIN inscriptions i ON i.id = ai.inscription_id
+          AND i.annee_scolaire_id = ca.annee_scolaire_id
+          AND i.site_id = ca.site_id
+          AND i.statut = 'active'
         WHERE ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND ca.actif = true
+          AND s.actif = true AND s.nom NOT LIKE 'TEST-INT-%'
         GROUP BY ca.id, s.nom ORDER BY s.nom, ca.code_affichage`),
     ]);
     return { etablissement, sites: sites.rows, anneeActive: anneeActive.rows[0] || null, comptes: comptes.rows, classes: classes.rows };

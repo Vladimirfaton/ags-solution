@@ -10,7 +10,7 @@ const workspaceMeta = {
 export default function ManagementWorkspace({ role, user, cardService, establishmentName, section, setSection, onLogout, content, error, notice }) {
   const meta = workspaceMeta[role];
   const menu = role === 'secretaire' && cardService?.actif
-    ? [...(meta?.menu || []), { id: 'cartes', label: 'Cartes FVS', icon: <Users className="h-4 w-4" /> }]
+    ? [...(meta?.menu || []), { id: 'cartes', label: 'Cartes d’identité scolaire', icon: <Users className="h-4 w-4" /> }]
     : (meta?.menu || []);
   return (
   <div className="h-screen overflow-hidden bg-[#f7faf8] text-slate-900 flex">

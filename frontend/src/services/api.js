@@ -4,6 +4,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 export const FILE_BASE_URL = API_URL.replace(/\/api\/?$/, '');
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -92,7 +93,7 @@ export const secretariatAPI = {
   createClass: (data) => api.post('/secretariat/classes', data),
   listStudentsByClass: (classId) => api.get(`/secretariat/classes/${classId}/eleves`),
   updateStudent: (id, data) => api.put(`/secretariat/eleves/${id}`, data),
-  transferStudent: (id, destinationClassId) => api.post(`/secretariat/eleves/${id}/transfert`, { destinationClassId }),
+  transferStudent: (id, destinationClassId, motif) => api.post(`/secretariat/eleves/${id}/transfert`, { destinationClassId, motif }),
 };
 
 export const comptabiliteAPI = {
@@ -141,6 +142,9 @@ export const censeurAPI = {
 export const cartesAPI = {
   status: () => api.get('/cartes/statut'),
   setStatus: (actif) => api.put('/cartes/statut', { actif }),
+  setAdminStatus: (actif) => api.put('/cartes/autorisation-admin', { actif }),
+  confirmSites: (siteIds) => api.put('/cartes/sites', { siteIds }),
+  adminClasses: () => api.get('/cartes/admin/classes'),
   stats: () => api.get('/cartes/stats'),
   preview: (classId) => api.get(`/cartes/classes/${classId}/preview`),
 };

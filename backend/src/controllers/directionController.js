@@ -56,7 +56,14 @@ export const listArchivedClassStudents = async (req, res, next) => {
 
 export const saveFinancialConfiguration = async (req, res, next) => {
   try {
-    const { fees = [], tranches = [], plans = [] } = req.body;
+    const { fees = [], tranches: requestedTranches = [], plans = [] } = req.body;
+    const sourceTranches = requestedTranches.length ? requestedTranches : (plans[0]?.tranches || []);
+    const tranches = sourceTranches.map((tranche, index) => ({
+      ...tranche,
+      nom: tranche.nom || tranche.tranche_nom,
+      dateEcheance: tranche.dateEcheance || tranche.date_echeance,
+      ordre: Number(tranche.ordre || index + 1),
+    }));
     if (!Array.isArray(fees) || !Array.isArray(plans)) return res.status(400).json({ error: 'La configuration financière est invalide.' });
     for (const fee of fees) {
       if (!fee.nom?.trim() || !Number.isFinite(Number(fee.montant)) || Number(fee.montant) < 0) return res.status(400).json({ error: 'Chaque frais doit avoir un nom et un montant valide.' });

@@ -120,9 +120,25 @@ export class StudentRegistry {
         FOR UPDATE OF i, ai`, scope.allSites ? [studentId] : [studentId, scope.siteIds]);
       const destination = await client.query(`SELECT id, site_id FROM classes_annuelles
         WHERE id = $1 AND annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND actif = true`, [destinationClassId]);
-      if (!source.rowCount || !destination.rowCount) throw Object.assign(new Error('Transfert impossible : élève ou classe de destination invalide.'), { status: 400, expose: true });
+      if (!destination.rowCount) throw Object.assign(new Error('Transfert impossible : élève ou classe de destination invalide.'), { status: 400, expose: true });
+      if (!source.rowCount) {
+        const current = await client.query(`SELECT ca.id AS classe_id
+          FROM inscriptions i
+          JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+          JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+          WHERE i.eleve_id = $1 AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND i.statut = 'active'${sourceSiteFilter}
+          FOR UPDATE OF i, ai`, scope.allSites ? [studentId] : [studentId, scope.siteIds]);
+        if (current.rows[0]?.classe_id === destinationClassId) {
+          await client.query('COMMIT');
+          return { studentId, destinationClassId, motif: cleanMotif, alreadyInDestination: true };
+        }
+      }
+      if (!source.rowCount) throw Object.assign(new Error('Transfert impossible : élève ou classe de destination invalide.'), { status: 400, expose: true });
       if (!scope.allSites && (!scope.siteIds.includes(source.rows[0].site_id) || !scope.siteIds.includes(destination.rows[0].site_id))) throw Object.assign(new Error('Transfert vers un site non autorisé.'), { status: 403, expose: true });
-      if (source.rows[0].classe_id === destinationClassId) throw Object.assign(new Error('L’élève est déjà dans cette classe.'), { status: 409, expose: true });
+      if (source.rows[0].classe_id === destinationClassId) {
+        await client.query('COMMIT');
+        return { studentId, destinationClassId, motif: cleanMotif, alreadyInDestination: true };
+      }
       await client.query('UPDATE affectations_inscription SET active = false, date_fin = CURRENT_DATE WHERE id = $1', [source.rows[0].affectation_id]);
       await client.query('INSERT INTO affectations_inscription (inscription_id, classe_annuelle_id, created_by) VALUES ($1,$2,$3)', [source.rows[0].inscription_id, destinationClassId, userId]);
       await client.query('UPDATE inscriptions SET site_id = $1 WHERE id = $2', [destination.rows[0].site_id, source.rows[0].inscription_id]);
@@ -130,7 +146,7 @@ export class StudentRegistry {
         VALUES ($1, 'transfert_interne', CURRENT_DATE, $2, $3)`,
      [source.rows[0].inscription_id, cleanMotif, userId]);
       await client.query('COMMIT');
-       return { studentId, destinationClassId, motif: cleanMotif };
+      return { studentId, destinationClassId, motif: cleanMotif, alreadyInDestination: false };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

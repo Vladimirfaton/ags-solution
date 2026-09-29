@@ -27,6 +27,15 @@ export class OverdueInstallments {
       WHERE o.type = 'tranche_scolarite' AND o.date_echeance < CURRENT_DATE
         AND i.statut = 'active'
         AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
+        AND EXISTS (
+          SELECT 1
+          FROM plans_tarifaires pt
+          JOIN tranches_tarifaires tt ON tt.plan_tarifaire_id = pt.id
+            AND tt.id = o.source_config_id AND tt.actif = true
+          WHERE pt.annee_scolaire_id = i.annee_scolaire_id
+            AND pt.site_id = i.site_id AND pt.classe_id = ca.classe_id
+            AND pt.division_nom IS NOT DISTINCT FROM ca.division_nom AND pt.actif = true
+        )
         ${siteFilter.sql}${searchFilter}
       GROUP BY o.id, e.id, ca.id
       HAVING o.montant_du - COALESCE(SUM(ap.montant_affecte) FILTER (WHERE p.statut = 'confirme'), 0) > 0

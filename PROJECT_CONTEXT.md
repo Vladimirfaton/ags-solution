@@ -422,3 +422,131 @@ Frontend : React 18, Vite, Tailwind, Axios, React Router, lucide-react, pdf-lib.
 
 Hébergement : frontend Vercel, backend Render plan gratuit, base Supabase.
 
+## 17. État réel mis à jour au 29 septembre 2026
+
+Cette section fait foi pour la reprise du projet. Elle complète les décisions précédentes sans les remplacer.
+
+### 17.1 Fondations et modèle scolaire
+
+Implémenté ou présent dans le dépôt :
+
+- migrations `node-pg-migrate` avec table de suivi `pgmigrations` ;
+- modèle moderne `etablissement`, `sites`, `annees_scolaires`, `classes_annuelles`, `classes`, `niveaux_scolaires`, `eleves`, `inscriptions` et affectations annuelles ;
+- comptes de gestion créés directement lors de l'initialisation de l'établissement ;
+- rôles `directeur`, `secretaire`, `comptable` et `censeur` ;
+- permissions serveur et portée par site via `AccessScope` ;
+- prise en charge des types `primaire` et `college` ;
+- niveaux reliés par `niveau_id`, avec `code` utilisé comme identifiant technique d'affichage/import ;
+- corrections de synchronisation des identifiants de comptes dans la migration `1790611438734_identifiants_role_nom.js`.
+
+Les anciens modèles `College`, `Class`, `college_id` et les fichiers du dossier `ref/` sont historiques. Ils ne doivent pas être utilisés pour ajouter une nouvelle fonctionnalité.
+
+### 17.2 Service Cartes d'identité scolaire : fonctionnement validé
+
+Le service Cartes est distinct de la gestion scolaire.
+
+Le flux cible et maintenant implémenté côté backend est :
+
+```text
+Administrateur FVS
+  → autorise le service Cartes pour l'établissement
+      → Directeur confirme son adhésion
+          → sélectionne un ou plusieurs sites
+              → Directeur + Secrétaire voient Cartes d'identité scolaire
+                  → préparation par site
+Administrateur FVS
+  → génération finale réservée à l'espace admin
+```
+
+Règles :
+
+- l'admin doit d'abord autoriser le service avec `PUT /api/cartes/autorisation-admin` ;
+- un seul site est activé automatiquement après confirmation ;
+- plusieurs sites imposent la sélection des sites par le directeur ;
+- la sélection est enregistrée dans `services_cartes_sites` ;
+- le nom du site reste présent dans les listes/classes afin de ne pas mélanger les données ;
+- le directeur et la secrétaire ont les mêmes droits Cartes de préparation et de consultation ;
+- la génération finale ne doit jamais être exposée aux comptes de gestion ;
+- les permissions Cartes ne donnent pas accès à un autre site ;
+- le libellé utilisateur est « Cartes d'identité scolaire », pas « FVS Cartes ».
+
+Migration ajoutée et appliquée :
+
+- `1791000000000_activation-cartes-par-sites.js` ajoute `modules_plateforme.admin_actif` et la table `services_cartes_sites`.
+
+Le modèle `CardService` expose désormais l'autorisation admin, les sites autorisés et les classes modernes. Les routes Cartes utilisent exclusivement les tables modernes et `AccessScope`.
+
+### 17.3 Stockage des photos et signatures
+
+Les photos et signatures ne doivent pas être stockées dans les réponses SQL sous forme de fichiers ou de données binaires.
+
+- bucket Supabase Storage de référence : `ads-uploads` ;
+- `photo_path` et `signature_path` contiennent une URL publique ou un chemin Storage ;
+- le backend ne charge que les métadonnées et le chemin ;
+- l'interface charge une image uniquement lorsqu'elle doit être affichée ;
+- la génération PDF charge les photos uniquement pour la classe sélectionnée ;
+- ne jamais charger plusieurs centaines de photos dans une liste ou une requête globale.
+
+Le défaut `SUPABASE_STORAGE_BUCKET` a été aligné sur `ads-uploads` dans `backend/src/config/supabaseStorage.js`. Si une variable d'environnement différente est conservée, elle doit correspondre au bucket réellement utilisé en production.
+
+### 17.4 Corrections financières validées
+
+Deux problèmes ont été corrigés dans le modèle et les tests financiers :
+
+- `Payment.options()` formate désormais `date_echeance` avec `TO_CHAR(..., 'YYYY-MM-DD')` afin d'éviter les décalages de date liés au fuseau UTC ;
+- le test des paiements simultanés restaure son tarif de test avant exécution, car le test précédent modifiait volontairement le même tarif en deux tranches ;
+- Vitest utilise `fileParallelism: false` pour éviter les collisions entre fixtures PostgreSQL partagées.
+
+Validation actuelle : `6` fichiers de tests, `17` tests passés, `0` échec.
+
+### 17.5 Interfaces actuellement branchées
+
+Présent :
+
+- `AdminDashboard.jsx` contient l'autorisation admin du service Cartes ;
+- `DirectorCockpit.jsx` affiche le consentement et la sélection des sites ;
+- `DirectorWorkspace.jsx` affiche la section Cartes seulement après activation ;
+- `ManagementWorkspace.jsx` affiche la section Cartes à la secrétaire après activation de son site ;
+- `CardServicePanel.jsx` charge les classes et les élèves via les routes modernes ;
+- la génération PDF est masquée pour la direction et la secrétaire.
+
+Le dossier `ref/` reste uniquement une source de comportement et de mise en page. Il ne doit pas être importé directement dans l'application.
+
+### 17.6 Travaux encore restants
+
+Priorité immédiate :
+
+1. Finaliser le nouvel espace de préparation Cartes directeur/secrétaire à partir du comportement de `ref/DashboardGestion.jsx` :
+   - onglet Élèves ;
+   - onglet Brouillon ;
+   - onglet Observations ;
+   - notifications et état « brouillon prêt » ;
+   - actions limitées au site autorisé.
+2. Finaliser le dashboard admin de génération à partir du comportement de `ref/Dashboard.jsx` :
+   - navigation par site ;
+   - classes et élèves modernes ;
+   - aperçu brouillon ;
+   - génération finale A4/PVC avec données de l'établissement ;
+   - aucune référence à `College`, `Class` ou `college_id`.
+3. Ajouter les contrôleurs modernes pour les brouillons, observations et notifications si les contrôleurs actuels ne couvrent pas encore les tables modernes `cartes_brouillons` et `cartes_notifications`.
+4. Filtrer toutes les requêtes Cartes par `services_cartes_sites` en plus de la portée utilisateur, afin qu'un directeur ne génère ou ne consulte jamais un site non confirmé.
+5. Vérifier le bucket `ads-uploads`, les politiques Storage Supabase et les URLs publiques/signées en environnement réel.
+6. Corriger ou confirmer le build frontend, actuellement bloqué localement par `Cannot read directory "../..": Access is denied` dans esbuild Windows.
+7. Après branchement des interfaces, effectuer un test manuel multi-site : site A/site B, directeur et secrétaire, photos Storage, brouillon, observation et génération admin.
+
+### 17.7 Migrations et vérifications réalisées
+
+Commandes validées :
+
+```text
+npm.cmd run migrate -- up --check-order --dry-run
+→ No migrations to run! après application
+
+npm.cmd run migrate -- up --check-order --single-transaction
+→ migrations appliquées avec succès
+
+npm.cmd test
+→ 6 fichiers, 17 tests passés
+```
+
+Ne jamais appliquer une migration destructive sans vérifier la cible, le backup et le contenu réel de la base. La migration `1790339258594_remodelage-db.js` reste particulièrement sensible car elle contient une reconstruction destructive avec `TRUNCATE ... CASCADE`.

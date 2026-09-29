@@ -44,6 +44,18 @@ const baseCte = (filterSql) => `
       SELECT o.inscription_id, SUM(o.montant_du) AS total_du
       FROM obligations_financieres o
       WHERE o.type = 'tranche_scolarite'
+        AND EXISTS (
+          SELECT 1
+          FROM inscriptions i2
+          JOIN affectations_inscription ai2 ON ai2.inscription_id = i2.id AND ai2.active = true
+          JOIN classes_annuelles ca2 ON ca2.id = ai2.classe_annuelle_id
+          JOIN plans_tarifaires pt2 ON pt2.annee_scolaire_id = i2.annee_scolaire_id
+            AND pt2.site_id = i2.site_id AND pt2.classe_id = ca2.classe_id
+            AND pt2.division_nom IS NOT DISTINCT FROM ca2.division_nom AND pt2.actif = true
+          JOIN tranches_tarifaires tt2 ON tt2.plan_tarifaire_id = pt2.id
+            AND tt2.actif = true AND tt2.id = o.source_config_id
+          WHERE i2.id = o.inscription_id
+        )
       GROUP BY o.inscription_id
     ) due ON due.inscription_id = i.id
     LEFT JOIN (
@@ -52,6 +64,18 @@ const baseCte = (filterSql) => `
       JOIN affectations_paiement ap ON ap.obligation_financiere_id = o.id
       JOIN paiements p ON p.id = ap.paiement_id AND p.statut = 'confirme'
       WHERE o.type = 'tranche_scolarite'
+        AND EXISTS (
+          SELECT 1
+          FROM inscriptions i2
+          JOIN affectations_inscription ai2 ON ai2.inscription_id = i2.id AND ai2.active = true
+          JOIN classes_annuelles ca2 ON ca2.id = ai2.classe_annuelle_id
+          JOIN plans_tarifaires pt2 ON pt2.annee_scolaire_id = i2.annee_scolaire_id
+            AND pt2.site_id = i2.site_id AND pt2.classe_id = ca2.classe_id
+            AND pt2.division_nom IS NOT DISTINCT FROM ca2.division_nom AND pt2.actif = true
+          JOIN tranches_tarifaires tt2 ON tt2.plan_tarifaire_id = pt2.id
+            AND tt2.actif = true AND tt2.id = o.source_config_id
+          WHERE i2.id = o.inscription_id
+        )
       GROUP BY o.inscription_id
     ) paid ON paid.inscription_id = i.id
     LEFT JOIN (
@@ -64,6 +88,13 @@ const baseCte = (filterSql) => `
         GROUP BY ap.obligation_financiere_id
       ) pf ON pf.obligation_financiere_id = o.id
       WHERE o.type = 'frais_general' AND o.obligatoire = true AND o.montant_du - COALESCE(pf.paye, 0) > 0
+        AND EXISTS (
+          SELECT 1 FROM inscriptions i2
+          JOIN frais_generaux_config fg ON fg.id = o.source_config_id
+            AND fg.annee_scolaire_id = i2.annee_scolaire_id
+            AND fg.site_id = i2.site_id AND fg.actif = true
+          WHERE i2.id = o.inscription_id
+        )
       GROUP BY o.inscription_id
     ) fees ON fees.inscription_id = i.id
     WHERE i.statut = 'active'

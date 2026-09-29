@@ -42,6 +42,13 @@ describe('StudentRegistry', () => {
       fixture.userId,
       fixture.scope
     );
+    const repeatedTransfer = await StudentRegistry.transfer(
+      student.id,
+      fixture.destinationClassId,
+      'Nouvelle tentative après succès',
+      fixture.userId,
+      fixture.scope
+    );
 
     const [registry, assignments, movements] = await Promise.all([
       query('SELECT id FROM eleves WHERE id = $1', [student.id]),
@@ -61,6 +68,7 @@ describe('StudentRegistry', () => {
         [student.id]
       ),
     ]);
+    expect(repeatedTransfer.alreadyInDestination).toBe(true);
     expect(registry.rowCount).toBe(1);
     expect(assignments.rows).toHaveLength(2);
     expect(assignments.rows[0].active).toBe(false);
@@ -90,7 +98,24 @@ it('sérialise deux transferts simultanés du même élève', async () => {
       ),
     ]);
 
-    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(2);
+    expect(results.some((result) => result.status === 'fulfilled' && result.value.alreadyInDestination)).toBe(true);
+    const assignments = await query(
+      `SELECT classe_annuelle_id, active
+       FROM affectations_inscription ai
+       JOIN inscriptions i ON i.id = ai.inscription_id
+       WHERE i.eleve_id = $1`,
+      [student.id]
+    );
+    const movements = await query(
+      `SELECT mi.id
+       FROM mouvements_inscription mi
+       JOIN inscriptions i ON i.id = mi.inscription_id
+       WHERE i.eleve_id = $1`,
+      [student.id]
+    );
+    expect(assignments.rows).toHaveLength(2);
+    expect(assignments.rows.filter((assignment) => assignment.active)).toHaveLength(1);
+    expect(movements.rows).toHaveLength(1);
   }, 15000);
  });

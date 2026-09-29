@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Building2, CalendarDays, IdCard, MapPin, School, Users } from 'lucide-react';
 import SchoolYearPanel, { YearArchives } from './SchoolYearPanel';
 const formatNumber = (value) => Number(value || 0).toLocaleString('fr-FR');
@@ -38,7 +39,8 @@ const sortClasses = (classes = []) => [...classes].sort((a, b) => {
     sensitivity: 'base',
   });
 });
-export default function DirectorCockpit({ direction, schoolYears = [], yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear, loadClass }) {
+export default function DirectorCockpit({ direction, schoolYears = [], yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear, loadClass, cardService, toggleCards }) {
+  const [selectedCardSites, setSelectedCardSites] = useState([]);
   const sites = direction?.sites || [];
   const classes = sortClasses(direction?.classes || []);
   const classesBySite = sites.map((site) => ({ site, classes: classes.filter((item) => item.site_id === site.id || item.site_nom === site.nom) }));
@@ -112,10 +114,13 @@ export default function DirectorCockpit({ direction, schoolYears = [], yearForm,
       </span>
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">FVS Cartes</p>
-        <h3 className="mt-2 font-semibold text-slate-900">Service non activé</h3>
+        <h3 className="mt-2 font-semibold text-slate-900">{cardService?.actif ? 'Service activé' : 'Service non activé'}</h3>
         <p className="mt-2 text-xs leading-5 text-slate-500">
-          Les classes et effectifs existants seront transmis au service sans double saisie lorsqu’il sera activé par FVS.
+          Les classes et effectifs existants seront transmis au service sans double saisie. {cardService?.actif ? 'La section Cartes est disponible dans la barre latérale.' : 'Activez-la pour ouvrir le module de génération des cartes.'}
         </p>
+        {!cardService?.actif && cardService?.admin_actif && cardService?.sites?.length > 1 && <div className="mt-4 space-y-2">{cardService.sites.map((site) => <label key={site.id} className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={selectedCardSites.includes(site.id)} onChange={(event) => setSelectedCardSites((current) => event.target.checked ? [...current, site.id] : current.filter((id) => id !== site.id))} />{site.nom}</label>)}</div>}
+        {!cardService?.actif && cardService?.admin_actif && <button type="button" onClick={() => toggleCards(selectedCardSites)} disabled={cardService?.sites?.length > 1 && !selectedCardSites.length} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Activer la section Cartes</button>}
+        {!cardService?.actif && !cardService?.admin_actif && <p className="mt-4 text-xs font-medium text-amber-700">L’administrateur doit d’abord autoriser ce service.</p>}
       </div>
     </div>
   </section>

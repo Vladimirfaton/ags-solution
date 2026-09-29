@@ -9,9 +9,32 @@ export class Payment {
      sql: ' AND i.site_id = ANY($1::uuid[])',
      params: [scope.siteIds],
    };
+    // Reconcile les obligations des anciennes inscriptions avec la
+    // configuration active du tarif avant d'alimenter la caisse. Cette
+    // operation est idempotente et ne modifie jamais les paiements existants.
+    await query(`INSERT INTO obligations_financieres
+      (inscription_id, type, source_config_id, libelle, montant_du, obligatoire, date_echeance, ordre)
+      SELECT i.id, 'tranche_scolarite', tt.id,
+        ca.code_affichage || ' - ' || tt.nom, tt.montant, true,
+        tt.date_echeance, 1000 + tt.ordre
+      FROM inscriptions i
+      JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+      JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+      JOIN plans_tarifaires pt ON pt.annee_scolaire_id = i.annee_scolaire_id
+        AND pt.site_id = i.site_id AND pt.classe_id = ca.classe_id
+        AND pt.division_nom IS NOT DISTINCT FROM ca.division_nom AND pt.actif = true
+      JOIN tranches_tarifaires tt ON tt.plan_tarifaire_id = pt.id AND tt.actif = true
+      WHERE i.statut = 'active'${siteFilter.sql}
+        AND NOT EXISTS (
+          SELECT 1 FROM obligations_financieres o
+          WHERE o.inscription_id = i.id
+            AND o.type = 'tranche_scolarite'
+            AND o.source_config_id = tt.id
+        )`, siteFilter.params);
     const result = await query(`SELECT i.id AS inscription_id, e.matricule, e.nom, e.prenom,
         ca.code_affichage,
-        o.id AS obligation_id, o.type, o.libelle, o.montant_du, o.date_echeance,
+        o.id AS obligation_id, o.type, o.libelle, o.montant_du,
+        TO_CHAR(o.date_echeance, 'YYYY-MM-DD') AS date_echeance,
         COALESCE(SUM(CASE WHEN p.statut = 'confirme' THEN ap.montant_affecte ELSE 0 END), 0) AS montant_paye, o.obligatoire
       FROM inscriptions i
       JOIN eleves e ON e.id = i.eleve_id
@@ -20,7 +43,23 @@ export class Payment {
       JOIN obligations_financieres o ON o.inscription_id = i.id
       LEFT JOIN affectations_paiement ap ON ap.obligation_financiere_id = o.id
       LEFT JOIN paiements p ON p.id = ap.paiement_id
-      WHERE i.statut = 'active'${siteFilter.sql}
+      WHERE i.statut = 'active'
+        AND ((o.type = 'frais_general' AND EXISTS (
+          SELECT 1 FROM frais_generaux_config fg
+          WHERE fg.id = o.source_config_id AND fg.actif = true
+            AND fg.annee_scolaire_id = i.annee_scolaire_id AND fg.site_id = i.site_id
+        )) OR EXISTS (
+          SELECT 1
+          FROM plans_tarifaires pt
+          JOIN tranches_tarifaires tt ON tt.plan_tarifaire_id = pt.id AND tt.actif = true
+          WHERE pt.annee_scolaire_id = i.annee_scolaire_id
+            AND pt.site_id = i.site_id
+            AND pt.classe_id = ca.classe_id
+            AND pt.division_nom IS NOT DISTINCT FROM ca.division_nom
+            AND pt.actif = true
+            AND tt.id = o.source_config_id
+        ))
+        ${siteFilter.sql}
       GROUP BY i.id, e.id, ca.id, o.id
      ORDER BY e.nom, e.prenom, o.ordre`, siteFilter.params);
     const students = new Map();
@@ -64,6 +103,23 @@ export class Payment {
         LEFT JOIN affectations_paiement ap ON ap.obligation_financiere_id = o.id
         LEFT JOIN paiements p ON p.id = ap.paiement_id
         WHERE o.inscription_id = $1 AND o.id = ANY($2::uuid[])
+          AND (o.type = 'frais_general' AND EXISTS (
+            SELECT 1 FROM inscriptions i
+            JOIN frais_generaux_config fg ON fg.annee_scolaire_id = i.annee_scolaire_id
+              AND fg.site_id = i.site_id AND fg.id = o.source_config_id AND fg.actif = true
+            WHERE i.id = o.inscription_id
+          ) OR o.type = 'tranche_scolarite' AND EXISTS (
+            SELECT 1 FROM inscriptions i
+            JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+            JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+            JOIN plans_tarifaires pt ON pt.annee_scolaire_id = i.annee_scolaire_id
+              AND pt.site_id = i.site_id AND pt.classe_id = ca.classe_id
+              AND pt.division_nom IS NOT DISTINCT FROM ca.division_nom AND pt.actif = true
+            JOIN tranches_tarifaires tt ON tt.plan_tarifaire_id = pt.id
+              AND tt.id = o.source_config_id AND tt.actif = true
+            WHERE i.id = o.inscription_id
+          ))
+
         GROUP BY o.id`, [inscriptionId, ids]);
       if (obligations.rowCount !== ids.length) fail('Une obligation sélectionnée est introuvable.');
 
@@ -74,7 +130,14 @@ export class Payment {
         FROM obligations_financieres o
         LEFT JOIN affectations_paiement ap ON ap.obligation_financiere_id = o.id
         LEFT JOIN paiements p ON p.id = ap.paiement_id
-        WHERE o.inscription_id = $1 GROUP BY o.id`, [inscriptionId]);
+        WHERE o.inscription_id = $1
+          AND (o.type <> 'frais_general' OR EXISTS (
+            SELECT 1 FROM inscriptions i
+            JOIN frais_generaux_config fg ON fg.annee_scolaire_id = i.annee_scolaire_id
+              AND fg.site_id = i.site_id AND fg.id = o.source_config_id AND fg.actif = true
+            WHERE i.id = o.inscription_id
+          ))
+        GROUP BY o.id`, [inscriptionId]);
       const hasPreviousPayment = allObligations.rows.some((row) => Number(row.montant_paye) > 0);
       const generalFees = allObligations.rows.filter((row) => row.type === 'frais_general' && row.obligatoire);
       for (const obligation of obligations.rows) {

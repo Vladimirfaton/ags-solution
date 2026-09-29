@@ -4,12 +4,12 @@ import { directionAPI } from '../services/api';
 import DirectorCockpit from './DirectorCockpit';
 import EstablishmentStudentsPanel from './EstablishmentStudentsPanel';
 
-export default function DirectorWorkspace({ user, establishmentName, onLogout, section, setSection, cockpitProps, content, error, notice }) {
+export default function DirectorWorkspace({ user, establishmentName, cardService, onLogout, section, setSection, cockpitProps, content, error, notice }) {
   const sites = cockpitProps?.direction?.sites || [];
   const navigation = [
     { id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> },
     { id: 'recherche-eleve', label: 'Rechercher un élève', icon: <Search className="h-4 w-4" /> },
-    { id: 'cartes', label: 'Cartes FVS', icon: <Building2 className="h-4 w-4" /> },
+    ...(cardService?.actif ? [{ id: 'cartes', label: 'Cartes d’identité scolaire', icon: <Building2 className="h-4 w-4" /> }] : []),
     { id: 'profil', label: 'Mon profil', icon: <UserRound className="h-4 w-4" /> },
     { id: 'securite', label: 'Sécurité', icon: <KeyRound className="h-4 w-4" /> },
     { id: 'assistance', label: 'Assistance', icon: <LifeBuoy className="h-4 w-4" /> },

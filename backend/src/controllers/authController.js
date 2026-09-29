@@ -6,7 +6,6 @@ import { Admin } from '../models/Admin.js';
 import { Session } from '../models/Session.js';
 import { generateOTP, saveOTP, verifyOTP } from '../utils/otpUtils.js';
 import { sendOtpEmail, sendSimpleEmail } from '../utils/email.js';
-import { normalizeUsername } from '../utils/username.js';
 import { isValidPassword } from '../utils/validators.js';
 import { PLATFORM_NAME } from '../config/branding.js';
 
@@ -55,7 +54,7 @@ export const resendOtp = async (req, res) => {
 export const verifyToken = (req, res) => res.json({ valid: true, user: publicUser(req.user, req.user.accountType) });
 export const loginGestion = async (req, res) => {
   try {
-    const username = normalizeUsername(req.body.username || ''); const { password } = req.body;
+    const username = req.body.username || ''; const { password } = req.body;
     const user = username && password ? await User.findByUsername(username) : null;
     if (!user || !User.isManagementRole(user.role) || !(await User.verifyPassword(password, user.password_hash))) return res.status(401).json({ error: 'Identifiants invalides' });
     if (user.status !== 'active' || user.disabled_at) return res.status(403).json({ error: 'Compte désactivé', code: 'ACCOUNT_DISABLED' });
@@ -75,7 +74,7 @@ export const changeMyPassword = async (req, res) => {
 };
 export const requestPasswordReset = async (req, res) => {
   try {
-    const user = await User.findByUsername(normalizeUsername(req.body.username || ''));
+    const user = await User.findByUsername(req.body.username || '');
     if (user && User.isManagementRole(user.role) && user.email) {
       const token = crypto.randomBytes(32).toString('hex');
       await User.setResetToken(user.id, hash(token), new Date(Date.now() + 30 * 60 * 1000));

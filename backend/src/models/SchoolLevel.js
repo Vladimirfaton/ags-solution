@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { query } from '../config/database.js';
+import { pool, query } from '../config/database.js';
 
 const slugify = (value) => value.trim().toLowerCase()
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -33,9 +33,18 @@ export class SchoolLevel {
     return created.rows[0];
   }
   static async reorder(cycleId, orderedIds) {
-    const client = await query('BEGIN').then(() => null).catch(() => null); // placeholder si pool.connect utilisé ailleurs
-    for (let i = 0; i < orderedIds.length; i++) {
-      await query('UPDATE niveaux_scolaires SET ordre = $1 WHERE id = $2 AND cycle_id = $3', [i + 1, orderedIds[i], cycleId]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < orderedIds.length; i++) {
+        await client.query('UPDATE niveaux_scolaires SET ordre = $1 WHERE id = $2 AND cycle_id = $3', [i + 1, orderedIds[i], cycleId]);
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
     return this.list();
   }

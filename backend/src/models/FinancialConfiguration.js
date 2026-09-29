@@ -27,8 +27,8 @@ export class FinancialConfiguration {
                     tt.id AS tranche_id, tt.ordre AS tranche_ordre, tt.nom AS tranche_nom,
                     tt.montant AS tranche_montant, tt.date_echeance, tt.actif AS tranche_actif
              FROM plans_tarifaires pt
-             LEFT JOIN tranches_tarifaires tt ON tt.plan_tarifaire_id = pt.id
-             WHERE pt.annee_scolaire_id = $1 AND pt.site_id = $2
+             LEFT JOIN tranches_tarifaires tt ON tt.plan_tarifaire_id = pt.id AND tt.actif = true
+             WHERE pt.annee_scolaire_id = $1 AND pt.site_id = $2 AND pt.actif = true
              ORDER BY pt.classe_id, pt.division_nom NULLS FIRST, tt.ordre`, [yearId, siteId]),
     ]);
 
@@ -63,17 +63,23 @@ export class FinancialConfiguration {
 
       for (const fee of fees) {
         const values = [fee.nom.trim(), normalizeMoney(fee.montant), fee.applicableA, Boolean(fee.obligatoire), Number(fee.ordre || 0), Boolean(fee.actif ?? true), yearId, siteId];
+        let feeId;
         if (fee.id) {
           const result = await client.query(`UPDATE frais_generaux_config
             SET nom = $1, montant = $2, applicable_a = $3, obligatoire = $4, ordre = $5, actif = $6
             WHERE id = $7 AND annee_scolaire_id = $8 AND site_id = $9 RETURNING id`, [...values.slice(0, 6), fee.id, yearId, siteId]);
           if (!result.rowCount) throw Object.assign(new Error('Frais général introuvable pour cette année.'), { status: 400, expose: true });
-          feeIds.push(fee.id);
+          feeId = fee.id;
         } else {
           const result = await client.query(`INSERT INTO frais_generaux_config (nom, montant, applicable_a, obligatoire, ordre, actif, annee_scolaire_id, site_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`, values);
-          feeIds.push(result.rows[0].id);
+          feeId = result.rows[0].id;
         }
+        feeIds.push(feeId);
+        await client.query(`UPDATE obligations_financieres
+          SET libelle = $1, montant_du = $2, obligatoire = $3, ordre = $4
+          WHERE source_config_id = $5 AND type = 'frais_general'`,
+        [fee.nom.trim(), normalizeMoney(fee.montant), Boolean(fee.obligatoire), Number(fee.ordre || 0), feeId]);
       }
       await client.query(`UPDATE frais_generaux_config SET actif = false WHERE annee_scolaire_id = $1 AND site_id = $2${feeIds.length ? ' AND id <> ALL($3::uuid[])' : ''}`, feeIds.length ? [yearId, siteId, feeIds] : [yearId, siteId]);
 
@@ -94,6 +100,9 @@ export class FinancialConfiguration {
           planId = result.rows[0].id;
         }
         planIds.push(planId);
+        const orderRange = await client.query(`SELECT COALESCE(MAX(ordre) - MIN(ordre) + 1, 1) AS offset
+          FROM tranches_tarifaires WHERE plan_tarifaire_id = $1`, [planId]);
+        await client.query('UPDATE tranches_tarifaires SET ordre = ordre + $2 WHERE plan_tarifaire_id = $1', [planId, Number(orderRange.rows[0].offset)]);
         const trancheIds = [];
         for (const [trancheIndex, tranche] of (plan.tranches || []).entries()) {
           const echeance = tranches[trancheIndex] || tranche;
@@ -110,6 +119,34 @@ export class FinancialConfiguration {
           }
         }
         await client.query(`UPDATE tranches_tarifaires SET actif = false WHERE plan_tarifaire_id = $1${trancheIds.length ? ' AND id <> ALL($2::uuid[])' : ''}`, trancheIds.length ? [planId, trancheIds] : [planId]);
+        await client.query(`UPDATE obligations_financieres o
+          SET libelle = ca.code_affichage || ' - ' || tt.nom,
+              montant_du = tt.montant,
+              date_echeance = tt.date_echeance,
+              ordre = 1000 + tt.ordre
+          FROM inscriptions i
+          JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+          JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+          JOIN tranches_tarifaires tt ON tt.plan_tarifaire_id = $1
+          WHERE o.inscription_id = i.id AND o.type = 'tranche_scolarite'
+            AND o.source_config_id = tt.id
+            AND i.statut = 'active' AND i.annee_scolaire_id = $2 AND i.site_id = $3
+            AND ca.id = $4`, [planId, yearId, siteId, plan.classeAnnuelleId]);
+        await client.query(`INSERT INTO obligations_financieres
+          (inscription_id, type, source_config_id, libelle, montant_du, obligatoire, date_echeance, ordre)
+          SELECT i.id, 'tranche_scolarite', tt.id, ca.code_affichage || ' - ' || tt.nom,
+            tt.montant, true, tt.date_echeance, 1000 + tt.ordre
+          FROM inscriptions i
+          JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+          JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+          JOIN tranches_tarifaires tt ON tt.plan_tarifaire_id = $1 AND tt.actif = true
+          WHERE i.statut = 'active' AND i.annee_scolaire_id = $2 AND i.site_id = $3
+            AND ca.id = $4
+            AND NOT EXISTS (
+              SELECT 1 FROM obligations_financieres o
+              WHERE o.inscription_id = i.id AND o.type = 'tranche_scolarite'
+                AND o.source_config_id = tt.id
+            )`, [planId, yearId, siteId, plan.classeAnnuelleId]);
       }
       await client.query(`UPDATE plans_tarifaires SET actif = false WHERE annee_scolaire_id = $1 AND site_id = $2${planIds.length ? ' AND id <> ALL($3::uuid[])' : ''}`, planIds.length ? [yearId, siteId, planIds] : [yearId, siteId]);
       await client.query('COMMIT');

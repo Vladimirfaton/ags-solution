@@ -24,7 +24,7 @@ export class User {
     return result;
   }
   static async findByEmail(email) { const result = await query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email.trim()]); return result.rows[0] || null; }
-  static async findByUsername(username) { const result = await query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); return result.rows[0] || null; }
+  static async findByUsername(username) { const result = await query('SELECT * FROM users WHERE username = $1', [username]); return result.rows[0] || null; }
   static async findByCollege(etablissementId) {
     const result = await query(`SELECT id, email, role, username, nom, prenom, telephone, status, disabled_at, password_personalized
       FROM users WHERE etablissement_id = $1 AND role = ANY($2::varchar[]) ORDER BY role, nom, prenom`, [etablissementId, MANAGEMENT_ROLES]);
@@ -54,12 +54,14 @@ static async setProfile(userId, { nom, prenom, email, telephone, username: reque
   if (!current) return null;
   const cleanNom = nom?.trim() || null;
   const cleanPrenom = prenom?.trim() || null;
+  if (!cleanNom || !cleanPrenom) throw Object.assign(new Error('Le nom et le prénom sont requis.'), { status: 400, expose: true });
+  if (`${current.role}-${cleanNom}`.length > 100) throw Object.assign(new Error('Le nom est trop long pour former l’identifiant.'), { status: 400, expose: true });
   let username = current.username;
-  let usernameLocked = current.username_locked;
+  let usernameLocked = false;
 
-  if (current.username_locked) {
+  if (current.username_locked && !cleanNom) {
     // Verrouillé : toute tentative de le changer est ignorée.
-  } else if (requestedUsername?.trim() && normalizeUsername(requestedUsername) !== normalizeUsername(current.username || '')) {
+  } else if (!cleanNom && requestedUsername?.trim() && normalizeUsername(requestedUsername) !== normalizeUsername(current.username || '')) {
     const candidate = normalizeUsername(requestedUsername.trim());
     if (!candidate) throw Object.assign(new Error('Identifiant invalide.'), { status: 400, expose: true });
     const duplicate = await query('SELECT 1 FROM users WHERE LOWER(username) = LOWER($1) AND id <> $2', [candidate, userId]);
@@ -67,16 +69,14 @@ static async setProfile(userId, { nom, prenom, email, telephone, username: reque
     username = candidate;
     usernameLocked = true;
   } else if (cleanNom && cleanPrenom) {
-    const prefixes = { directeur: 'Dir', secretaire: 'Sec', comptable: 'Compt', censeur: 'Cens' };
-    const firstLetter = normalizeUsername(cleanNom).charAt(0).toUpperCase();
-    const readablePrenom = cleanPrenom.charAt(0).toUpperCase() + cleanPrenom.slice(1);
-    const base = `${prefixes[current.role]}-${firstLetter}${readablePrenom}`;
+    const base = `${current.role}-${cleanNom}`;
     username = base;
     let suffix = 2;
     while (true) {
-      const duplicate = await query('SELECT 1 FROM users WHERE LOWER(username) = LOWER($1) AND id <> $2', [username, userId]);
+      const duplicate = await query('SELECT 1 FROM users WHERE username = $1 AND id <> $2', [username, userId]);
       if (!duplicate.rowCount) break;
-      username = `${base}${suffix++}`;
+      username = `${base}-${suffix++}`;
+      if (username.length > 100) throw Object.assign(new Error('Impossible de créer un identifiant unique pour ce nom.'), { status: 409, expose: true });
     }
   }
 

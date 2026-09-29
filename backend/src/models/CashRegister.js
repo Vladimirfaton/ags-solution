@@ -27,6 +27,17 @@ export class CashRegister {
           WHERE o.type = 'tranche_scolarite' AND o.date_echeance < CURRENT_DATE
             AND i.statut = 'active'
             AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')
+            AND EXISTS (
+              SELECT 1
+              FROM affectations_inscription ai
+              JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+              JOIN plans_tarifaires pt ON pt.annee_scolaire_id = i.annee_scolaire_id
+                AND pt.site_id = i.site_id AND pt.classe_id = ca.classe_id
+                AND pt.division_nom IS NOT DISTINCT FROM ca.division_nom AND pt.actif = true
+              JOIN tranches_tarifaires tt ON tt.plan_tarifaire_id = pt.id
+                AND tt.id = o.source_config_id AND tt.actif = true
+              WHERE ai.inscription_id = i.id AND ai.active = true
+            )
             ${siteFilter.sql}
           GROUP BY o.id
         )

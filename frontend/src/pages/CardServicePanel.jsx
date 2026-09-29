@@ -1,22 +1,36 @@
 import { useState } from 'react';
 import { cartesAPI } from '../services/api';
+import { buildFinalCardsPdfBytes, getSchoolYear } from '../utils/pdfUtils';
 
-export default function CardServicePanel({ classes = [], cardService, canActivate = false, onToggle }) {
+export default function CardServicePanel({ classes = [], cardService, canActivate = false, canGenerate = false, onToggle, establishmentName = '' }) {
+  const service = cardService || { actif: true };
   const [selectedClass, setSelectedClass] = useState('');
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
+  const [generating, setGenerating] = useState(false);
   const loadPreview = async () => {
     if (!selectedClass) return;
     setError('');
     try { setPreview((await cartesAPI.preview(selectedClass)).data); }
     catch (err) { setError(err.response?.data?.error || 'Impossible de charger les élèves pour les cartes.'); }
   };
+  const generateCards = async () => {
+    if (!preview?.students?.length) return;
+    setGenerating(true); setError('');
+    try {
+      const bytes = await buildFinalCardsPdfBytes(preview.students, preview.classInfo, { nom: establishmentName }, { layout: 'a4', includeVerso: true, cropMarks: true });
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      const link = document.createElement('a'); link.href = url; link.download = `cartes-${preview.classInfo.code_affichage || 'classe'}-${getSchoolYear()}.pdf`; link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) { setError(err.message || 'Impossible de générer les cartes.'); }
+    finally { setGenerating(false); }
+  };
   return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-    <h2 className="text-xl font-semibold text-slate-900">Cartes FVS</h2>
+    <h2 className="text-xl font-semibold text-slate-900">Cartes d’identité scolaire</h2>
     <p className="mt-1 text-sm text-slate-500">Les cartes utilisent les classes annuelles et les inscriptions actives.</p>
     {error && <p className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-    {!cardService?.actif && canActivate && <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm text-amber-800">Le service Cartes est désactivé.</p><button type="button" className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white" onClick={onToggle}>Activer le service Cartes</button></div>}
-    {!cardService?.actif && !canActivate && <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Le service Cartes n’est pas encore activé par la Direction.</p>}
+    {!service.actif && canActivate && <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm text-amber-800">Le service Cartes est désactivé.</p><button type="button" className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white" onClick={onToggle}>Activer le service Cartes</button></div>}
+    {!service.actif && !canActivate && <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Le service Cartes n’est pas encore activé par la Direction.</p>}
     <div className="mt-5 flex flex-col gap-3 sm:flex-row">
       <select className="input flex-1" value={selectedClass} onChange={(event) => setSelectedClass(event.target.value)}>
         <option value="">Choisir une classe annuelle</option>
@@ -30,6 +44,7 @@ export default function CardServicePanel({ classes = [], cardService, canActivat
         {preview.students.map((student) => <div key={student.id} className="py-2 text-sm text-slate-700">{student.nom} {student.prenom} <span className="text-slate-400">· {student.matricule}</span></div>)}
       </div>
       {!preview.students.length && <p className="mt-3 text-sm text-slate-500">Aucun élève inscrit dans cette classe.</p>}
+      {!!preview.students.length && canGenerate && <button type="button" className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={generateCards} disabled={generating}>{generating ? 'Génération...' : 'Générer les cartes PDF'}</button>}
     </div>}
   </section>;
 }
