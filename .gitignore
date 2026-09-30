@@ -10,7 +10,6 @@ uploads/
 .vscode/
 .idea/
 *.pem
-package-lock.json
 yarn.lock
 .superdesign/tmp/
 bash
