@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Upload } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Upload } from 'lucide-react';
 import { comptabiliteAPI } from '../services/api';
 
 export default function StudentImportPanel() {
@@ -9,6 +9,13 @@ export default function StudentImportPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const downloadTemplate = async () => {
+    try {
+      const response = await comptabiliteAPI.downloadStudentImportTemplate();
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a'); link.href = url; link.download = 'modele_import_eleves.xlsx'; link.click(); URL.revokeObjectURL(url);
+    } catch { setError('Impossible de télécharger le modèle Excel.'); }
+  };
 
   const inspect = async (event) => {
     event.preventDefault();
@@ -37,6 +44,7 @@ export default function StudentImportPanel() {
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600"><FileSpreadsheet className="h-5 w-5" /></span>
         <div><h3 className="font-semibold text-slate-900">Importer des élèves</h3><p className="mt-1 text-xs leading-5 text-slate-500">Chargez un fichier Excel pour vérifier les lignes avant leur création dans les inscriptions.</p></div>
       </div>
+      <button type="button" onClick={downloadTemplate} className="mt-4 flex items-center gap-2 rounded-lg border border-sky-200 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-50"><Download className="h-4 w-4" />Télécharger le modèle Excel</button>
       <form onSubmit={inspect} className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
         <label className="min-w-0 flex-1 cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-slate-400">Fichier Excel (.xlsx)<input type="file" accept=".xlsx" onChange={(event) => { setFile(event.target.files?.[0] || null); setPreview(null); setError(''); }} className="mt-2 block w-full cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-700 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold" /></label>
         <button disabled={busy || !file} className="flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"><Upload className="h-4 w-4" />{busy ? 'Analyse…' : 'Analyser le fichier'}</button>

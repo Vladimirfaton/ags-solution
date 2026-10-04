@@ -86,12 +86,14 @@ export const directionAPI = {
   listYearClasses: (id) => api.get(`/direction/annees-scolaires/${id}/classes`),
   listArchivedClassStudents: (classId) => api.get(`/direction/archives/classes/${classId}/eleves`),
   listStudents: (search = '', page = 1, siteId = null) => api.get('/direction/eleves', { params: { recherche: search, page, pageSize: 10, ...(siteId ? { siteId } : {}) } }),
+  studentFinancialDetails: (studentId) => api.get(`/direction/eleves/${studentId}/situation-financiere`),
 };
 
 export const secretariatAPI = {
-  listClasses: () => api.get('/secretariat/classes'),
+  listClasses: (search = '') => api.get('/secretariat/classes', { params: { recherche: search } }),
   createClass: (data) => api.post('/secretariat/classes', data),
   listStudentsByClass: (classId) => api.get(`/secretariat/classes/${classId}/eleves`),
+  updateClassCapacity: (classId, capacite) => api.put(`/secretariat/classes/${classId}/capacite`, { capacite }),
   updateStudent: (id, data) => api.put(`/secretariat/eleves/${id}`, data),
   transferStudent: (id, destinationClassId, motif) => api.post(`/secretariat/eleves/${id}/transfert`, { destinationClassId, motif }),
 };
@@ -112,6 +114,7 @@ export const comptabiliteAPI = {
     if (siteId) formData.append('siteId', siteId);
     return api.post('/comptabilite/imports/eleves/confirmer', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
+  downloadStudentImportTemplate: () => api.get('/comptabilite/imports/eleves/modele', { responseType: 'blob' }),
   paymentOptions: () => api.get('/comptabilite/paiements/options'),
   createPayment: (data) => api.post('/comptabilite/paiements', data),
   financialConfiguration: () => api.get('/comptabilite/finances'),

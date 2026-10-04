@@ -2,14 +2,16 @@
 
 ## Règle absolue
 
-Le propriétaire du projet applique lui-même les modifications.
+Le propriétaire du projet applique lui-même les modifications. L'agent le fais quand il le lui donne l'autorisation.
 
 L'agent travaille en lecture seule par défaut :
 
 - ne jamais modifier, créer ou supprimer un fichier sans autorisation explicite ;
 - après autorisation, proposer un patch précis, mais ne pas l'appliquer directement sauf demande explicite distincte ;
 - ne jamais appliquer directement une migration, une suppression de modèle ou une modification de schéma ;
-- inspecter les fichiers réels, routes, modèles, contrôleurs, migrations et tests avant toute proposition ;
+- inspecter les fic
+
+hiers réels, routes, modèles, contrôleurs, migrations et tests avant toute proposition ;
 - distinguer l'état validé du code, les décisions d'architecture et les travaux restant à faire ;
 - après application manuelle d'un patch par le propriétaire, proposer les vérifications adaptées.
 

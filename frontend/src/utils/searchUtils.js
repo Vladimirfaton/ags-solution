@@ -31,12 +31,28 @@ export function matchClassSearch(item, query) {
   const fields = [
     item?.code_affichage,
     item?.code,
+    item?.niveau_code,
+    item?.code_niveau,
     item?.site_nom,
     item?.niveau,
+    item?.niveau_libelle,
     item?.division_nom,
     item?.nom,
     item?.libelle,
   ];
 
-  return fields.some((value) => normalizeSearchText(value).includes(q));
+  const matchesField = fields.some((value) => normalizeSearchText(value).includes(q));
+  if (matchesField) return true;
+
+  const levelAliases = {
+    primaire: ['ci', 'cp', 'ce1', 'ce2', 'cm1', 'cm2', 'cours d initiation', 'cours initiation'],
+    ci: ['cours d initiation', 'cours initiation'],
+  };
+  const aliases = levelAliases[q] || (q.includes('primaire') ? levelAliases.primaire : null);
+  if (!aliases) return false;
+
+  const normalizedFields = fields.map((value) =>
+    normalizeSearchText(value).replace(/[’']/g, ' ').replace(/\s+/g, ' ')
+  );
+  return aliases.some((alias) => normalizedFields.some((value) => value.includes(alias)));
 }

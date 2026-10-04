@@ -25,4 +25,25 @@ describe('search utils', () => {
     expect(matchClassSearch(item, '6e')).toBe(true);
     expect(matchClassSearch(item, 'abc')).toBe(false);
   });
+
+  it('matches the technical level code even when the displayed class name differs', () => {
+    const item = { code_affichage: 'Cours d’Initiation-A', niveau_code: 'CI' };
+    expect(matchClassSearch(item, 'CI')).toBe(true);
+  });
+
+  it('matches every group when searching by the bare CI level code', () => {
+    const classes = ['CI-A', 'CI-B', 'CI-C'].map((code_affichage) => ({ code_affichage }));
+    expect(classes.filter((item) => matchClassSearch(item, 'CI'))).toEqual(classes);
+  });
+
+  it('matches the CI code from a legacy displayed class name without level metadata', () => {
+    const item = { code_affichage: "Cours d'Initiation-A" };
+    expect(matchClassSearch(item, 'CI')).toBe(true);
+  });
+
+  it('matches primary classes when searching for the establishment type', () => {
+    expect(matchClassSearch({ code_affichage: 'CM1-A', niveau_code: 'CM1' }, 'primaire')).toBe(true);
+    expect(matchClassSearch({ code_affichage: "Cours d'Initiation-A" }, 'primaire')).toBe(true);
+    expect(matchClassSearch({ code_affichage: '6e-A', niveau_code: '6e' }, 'primaire')).toBe(false);
+  });
 });

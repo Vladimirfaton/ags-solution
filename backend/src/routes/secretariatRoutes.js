@@ -6,6 +6,7 @@ import {
   listCycles,
   listLevels,
   listStudentsByClass,
+  updateClassCapacity,
   transferStudent,
   updateStudent,
 } from '../controllers/secretariatController.js';
@@ -16,6 +17,7 @@ router.use(authenticate);
 router.get('/classes', authorizePermission('classe.consulter'), listClasses);
 router.post('/classes', authorizePermission('classe.gerer'), createClass);
 router.get('/classes/:classId/eleves', authorizePermission('eleve.consulter'), listStudentsByClass);
+router.put('/classes/:classId/capacite', authorizePermission('classe.gerer'), updateClassCapacity);
 router.put('/eleves/:id', authorizePermission('eleve.modifier'), updateStudent);
 router.post('/eleves/:id/transfert', authorizePermission('eleve.transferer'), transferStudent);
 router.get('/cycles', authorizePermission('classe.consulter'), listCycles);

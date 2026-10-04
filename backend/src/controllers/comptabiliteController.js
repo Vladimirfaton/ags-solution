@@ -4,6 +4,26 @@ import { StudentRegistry } from '../models/StudentRegistry.js';
 import { Payment } from '../models/Payment.js';
 import { accessScopeFor } from '../models/AccessScope.js';
 import { OverdueInstallments } from '../models/OverdueInstallments.js';
+import ExcelJS from 'exceljs';
+
+export const downloadStudentImportTemplate = async (_req, res, next) => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Élèves');
+    sheet.columns = [
+      { header: 'matricule', key: 'matricule', width: 22 }, { header: 'nom', key: 'nom', width: 24 }, { header: 'prenom', key: 'prenom', width: 24 },
+      { header: 'sexe', key: 'sexe', width: 12 }, { header: 'date_naissance', key: 'date_naissance', width: 18 }, { header: 'lieu_naissance', key: 'lieu_naissance', width: 24 },
+      { header: 'nationalite', key: 'nationalite', width: 18 }, { header: 'telephone', key: 'telephone', width: 20 },
+    ];
+    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="modele_import_eleves.xlsx"');
+    res.send(buffer);
+  } catch (error) { next(error); }
+};
 
 export const getCashOverview = async (req, res, next) => {
  try { res.json(await CashRegister.overview(await accessScopeFor(req.user))); } catch (error) { next(error); }

@@ -58,13 +58,13 @@ export class StudentRegistry {
     const establishment = await query('SELECT type FROM etablissement WHERE singleton = true');
     const allowedLevels = establishment.rows[0]?.type === 'primaire' ? ['CI', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'] : ['6e', '5e', '4e', '3e', '2nde', '1ere', 'terminale'];
     const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
-    const result = await query(`SELECT ca.id, ca.code_affichage, ca.division_nom, s.nom AS site_nom, n.ordre, COUNT(ai.id)::int AS effectif
+    const result = await query(`SELECT ca.id, ca.code_affichage, ca.division_nom, s.nom AS site_nom, n.ordre, n.code AS niveau_code, n.libelle AS niveau_libelle, COUNT(ai.id)::int AS effectif
       FROM classes_annuelles ca
       JOIN classes c ON c.id = ca.classe_id JOIN niveaux_scolaires n ON n.id = c.niveau_id
         JOIN sites s ON s.id = ca.site_id
       LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true
       WHERE ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND ca.actif = true AND n.code = ANY($1::text[])${siteFilter.sql}
-      GROUP BY ca.id, s.nom, n.ordre ORDER BY n.ordre, ca.division_nom`, [allowedLevels, ...siteFilter.params]);
+      GROUP BY ca.id, s.nom, n.ordre, n.code, n.libelle ORDER BY n.ordre, ca.division_nom`, [allowedLevels, ...siteFilter.params]);
     return result.rows;
   }
   static async listByClass(classId, scope) {

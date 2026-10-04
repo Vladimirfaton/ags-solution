@@ -68,7 +68,10 @@ export const updateMyProfile = async (req, res) => {
 };
 export const changeMyPassword = async (req, res) => {
   const { currentPassword, newPassword, confirmPassword } = req.body;
-  if (!currentPassword || !newPassword || newPassword !== confirmPassword || !isValidPassword(newPassword)) return res.status(400).json({ error: 'Nouveau mot de passe invalide ou non confirmé' });
+  if (!currentPassword || !newPassword || !confirmPassword) return res.status(400).json({ error: 'Les trois champs du mot de passe sont requis.' });
+  if (newPassword === currentPassword) return res.status(400).json({ error: 'Le nouveau mot de passe doit être différent de l’ancien.' });
+  if (newPassword !== confirmPassword) return res.status(400).json({ error: 'Le nouveau mot de passe doit être identique dans les deux cases.' });
+  if (!isValidPassword(newPassword)) return res.status(400).json({ error: 'Le nouveau mot de passe ne respecte pas les règles requises.' });
   if (!(await User.changePassword(req.user.id, currentPassword, newPassword))) return res.status(401).json({ error: 'Mot de passe actuel incorrect' });
   return res.json({ success: true });
 };

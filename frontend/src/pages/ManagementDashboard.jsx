@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Banknote, CalendarDays, ChevronLeft, ChevronRight, MapPin, Pencil, Plus, School, Search, Users } from 'lucide-react';
 import { authAPI, cartesAPI, censeurAPI, comptabiliteAPI, directionAPI, platformAPI, secretariatAPI } from '../services/api';
 import { PLATFORM_NAME } from '../config/branding';
@@ -19,6 +19,51 @@ const blankStudent = { matricule: '', nom: '', prenom: '', sexe: '', date_naissa
 const classRank = (value = '') => { const level = value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); const found = level.match(/(?:^|\s)(ci|cp|ce1|ce2|cm1|cm2|6|5|4|3)(?:e|eme)?|(?:^|\s)(2nde|2nd|seconde|1ere|1re|tle|terminale)/); const key = found?.[1] || found?.[2] || ''; return ({ ci: 1, cp: 2, ce1: 3, ce2: 4, cm1: 5, cm2: 6, 6: 10, 5: 11, 4: 12, 3: 13, '2nde': 14, '2nd': 14, seconde: 14, '1ere': 15, '1re': 15, tle: 16, terminale: 16 })[key] || 99; };
 const sortClasses = (classes = []) => [...classes].sort((a, b) => { const rank = classRank(a.code_affichage) - classRank(b.code_affichage); return rank || a.code_affichage.localeCompare(b.code_affichage, 'fr', { numeric: true, sensitivity: 'base' }); });
 const classLevelCode = (value = '') => { const normalized = value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s/g, ''); if (['ci', 'cp', 'ce1', 'ce2', 'cm1', 'cm2'].includes(normalized)) return normalized.toUpperCase(); if (['6', '6e', '6eme'].includes(normalized)) return '6e'; if (['5', '5e', '5eme'].includes(normalized)) return '5e'; if (['4', '4e', '4eme'].includes(normalized)) return '4e'; if (['3', '3e', '3eme'].includes(normalized)) return '3e'; if (['2nde', '2nd', 'seconde'].includes(normalized)) return '2nde'; if (['1ere', '1re'].includes(normalized)) return '1ere'; if (['tle', 'terminale', 'term'].includes(normalized)) return 'terminale'; return ''; };
+
+function useSecretaryClassSearch(classes, search, enabled = true) {
+  const [results, setResults] = useState(classes);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const term = search.trim();
+    let active = true;
+    if (!enabled || !term) {
+      setResults(classes);
+      setLoading(false);
+      setError('');
+      return () => { active = false; };
+    }
+
+    setLoading(true);
+    setError('');
+    const timer = setTimeout(() => {
+      secretariatAPI.listClasses(term)
+        .then(({ data }) => {
+          if (!active) return;
+          const serverClasses = Array.isArray(data.classes) ? data.classes : [];
+          const serverClassIds = new Set(serverClasses.map((item) => item.id));
+          const localMatches = classes.filter((item) =>
+            matchClassSearch(item, term) && !serverClassIds.has(item.id)
+          );
+          setResults(sortClasses([...serverClasses, ...localMatches]));
+        })
+        .catch(() => {
+          if (!active) return;
+          setResults([]);
+          setError('Impossible de rechercher les classes. Réessayez.');
+        })
+        .finally(() => { if (active) setLoading(false); });
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [classes, search, enabled]);
+
+  return { classes: results, loading, error };
+}
 
 export default function ManagementDashboard({ onLogout }) {
   const [user, setUser] = useState(null); const [section, setSection] = useState('tableau'); const [loading, setLoading] = useState(true); const [cardService, setCardService] = useState(null); const [establishmentType, setEstablishmentType] = useState('college');
@@ -62,8 +107,8 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, [user, section]);
   const action = async (work, success, after) => { setError(''); setNotice(''); try { await work(); await refresh(user.role); if (after) await after(); setNotice(success); return true; } catch (err) { setError(err.response?.data?.error || 'Opération impossible.'); return false; } };
-const saveProfile = (event) => { event.preventDefault(); action(async () => { const { data } = await authAPI.updateMyProfile(profile); setUser(data.user); sessionStorage.setItem('user', JSON.stringify(data.user)); setProfileEdit(false); }, 'Informations personnelles enregistrées.'); };
-  const savePassword = (event) => { event.preventDefault(); action(async () => { await authAPI.changeMyPassword(password); setPassword({ currentPassword: '', newPassword: '', confirmPassword: '' }); setUser({ ...user, passwordPersonalized: true }); }, 'Mot de passe modifié.'); };
+const saveProfile = (event, requestedUsername) => { event.preventDefault(); action(async () => { const { data } = await authAPI.updateMyProfile({ ...profile, ...(requestedUsername ? { username: requestedUsername } : {}) }); setUser(data.user); sessionStorage.setItem('user', JSON.stringify(data.user)); setProfileEdit(false); }, 'Informations personnelles enregistrées.'); };
+  const savePassword = (event) => { event.preventDefault(); setError(''); if (password.newPassword === password.currentPassword) return setError('Le nouveau mot de passe doit être différent de l’ancien.'); if (password.newPassword !== password.confirmPassword) return setError('Le nouveau mot de passe doit être identique dans les deux cases.'); action(async () => { await authAPI.changeMyPassword(password); setPassword({ currentPassword: '', newPassword: '', confirmPassword: '' }); setUser({ ...user, passwordPersonalized: true }); }, 'Mot de passe modifié.'); };
   const createYear = (event) => { event.preventDefault(); action(() => directionAPI.createFirstSchoolYear(yearForm), 'Année scolaire activée.'); };
  const createNextYear = (event) => { event.preventDefault(); action(() => directionAPI.createSchoolYear(yearForm), 'Brouillon créé : la configuration de l’année précédente a été copiée.', async () => setYearForm({ libelle: '', dateDebut: '', dateFin: '' })); };
   const activateYear = (id) => action(() => directionAPI.activateSchoolYear(id), 'Nouvelle année scolaire activée.');
@@ -73,6 +118,7 @@ const saveProfile = (event) => { event.preventDefault(); action(async () => { co
   const createClass = (event) => { event.preventDefault(); const niveauCode = classLevelCode(classForm.nom); const primaryLevels = ['CI', 'CP', 'CE1', 'CE2', 'CM1', 'CM2']; const divisionType = classForm.divisionType || (establishmentType === 'primaire' && primaryLevels.includes(niveauCode) ? 'groupe' : ['6e', '5e', '4e', '3e'].includes(niveauCode) ? 'groupe' : ['2nde', '1ere', 'terminale'].includes(niveauCode) ? 'serie' : ''); const valid = establishmentType === 'primaire' ? primaryLevels.includes(niveauCode) : !primaryLevels.includes(niveauCode) && Boolean(niveauCode); if (!valid) return setError(establishmentType === 'primaire' ? 'Choisissez un niveau primaire : CI, CP, CE1, CE2, CM1 ou CM2.' : 'Choisissez un niveau collège/lycée : 6ème à Terminale.'); if (!classForm.divisionNom?.trim() || !divisionType) return setError('Indiquez le groupe ou la série de la classe.'); action(() => secretariatAPI.createClass({ niveauCode, divisionNom: classForm.divisionNom.trim(), divisionType }), 'Classe annuelle créée.', async () => setClassForm({ nom: '', divisionNom: '', divisionType: '' })); };
   const updateStudent = (event) => { event.preventDefault(); action(() => secretariatAPI.updateStudent(editingStudent.id, editingStudent), 'Informations de l’élève mises à jour.', async () => { const id = classDetail.classInfo.id; setEditingStudent(null); await loadClass(id); }); };
   const moveStudent = (event) => { event.preventDefault(); action(() => secretariatAPI.transferStudent(transferStudent.id, transferStudent.destinationClassId, transferStudent.motif), 'Transfert interne enregistré.', async () => { const id = classDetail.classInfo.id; setTransferStudent(null); await loadClass(id); }); };
+  const updateClassCapacity = (classId, capacite) => action(() => secretariatAPI.updateClassCapacity(classId, capacite), 'Capacité de la classe mise à jour.', async () => setSecretaryClasses((await secretariatAPI.listClasses()).data?.classes || []));
   const createEnrollment = (event) => {
     event.preventDefault();
     const generalFees = (finance?.fees || []).filter((fee) => fee.actif && fee.obligatoire && (fee.applicable_a === enrollForm.type || fee.applicable_a === 'les_deux'));
@@ -92,12 +138,12 @@ const createPayment = async (payload, studentLabel) => {
 };
   if (loading) return <main className="min-h-screen grid place-items-center bg-slate-50 text-slate-500">Chargement...</main>;
   const toggleCards = (siteIds) => action(async () => { if (!cardService?.admin_actif) throw Object.assign(new Error('Le service Cartes doit d’abord être autorisé par l’administrateur FVS.'), { response: { data: { error: 'Le service Cartes doit d’abord être autorisé par l’administrateur FVS.' } } }); const selected = siteIds || (cardService?.sites?.length === 1 ? [cardService.sites[0].id] : []); const { data } = await cartesAPI.confirmSites(selected); setCardService(data); }, 'Section Cartes activée pour les sites sélectionnés.');
-  const content = section === 'profil' ? <Profile profile={profile} setProfile={setProfile} edit={profileEdit} setEdit={setProfileEdit} save={saveProfile} username={user.username}/> : section === 'securite' ? <Security password={password} setPassword={setPassword} save={savePassword}/> : <RoleContent {...{ user, role: user.role, section, setSection, direction, establishmentName, establishmentType, cardService, toggleCards, finance, saveFinancialConfiguration, secretaryClasses, censeurClasses, classDetail, loadClass, setClassDetail, classForm, setClassForm, createClass, yearForm, setYearForm, createYear, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent, cash, enrollOptions, enrollForm, setEnrollForm, createEnrollment, paymentOptions, createPayment, monitoring,financeRefreshKey}}/>;
+  const content = section === 'profil' ? <Profile profile={profile} setProfile={setProfile} edit={profileEdit} setEdit={setProfileEdit} save={saveProfile} username={user.username}/> : section === 'securite' ? <Security password={password} setPassword={setPassword} save={savePassword}/> : <RoleContent {...{ user, role: user.role, section, setSection, direction, establishmentName, establishmentType, cardService, toggleCards, finance, saveFinancialConfiguration, secretaryClasses, censeurClasses, classDetail, loadClass, setClassDetail, classForm, setClassForm, createClass, updateClassCapacity, yearForm, setYearForm, createYear, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent, cash, enrollOptions, enrollForm, setEnrollForm, createEnrollment, paymentOptions, createPayment, monitoring,financeRefreshKey}}/>;
   if (user.role === 'directeur') return <DirectorWorkspace user={user} establishmentName={establishmentName} cardService={cardService} onLogout={onLogout} section={section} setSection={setSection} content={content} error={error} notice={notice} cockpitProps={{ direction, schoolYears, yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear }} />;
   return <ManagementWorkspace role={user.role} user={user} cardService={cardService} establishmentName={establishmentName} section={section} setSection={setSection} onLogout={onLogout} content={content} error={error} notice={notice} />;
 }
 
-function RoleContent(props) { if (props.section === 'cartes') return <CardServicePanel classes={props.role === 'directeur' ? (props.direction?.classes || []) : props.role === 'secretaire' ? props.secretaryClasses : props.censeurClasses}/>; if (props.role === 'directeur') return props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <DirectorCockpit {...props}/>; const view = props.role === 'secretaire' ? (props.section === 'classes' ? <ClassRegistry {...props} editable/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <SecretaryHome {...props}/>) : props.role === 'comptable' ? (
+function RoleContent(props) { if (props.section === 'cartes') return <CardServicePanel classes={props.role === 'directeur' ? (props.direction?.classes || []) : props.role === 'secretaire' ? props.secretaryClasses : props.censeurClasses}/>; if (props.role === 'directeur') return props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <DirectorCockpit {...props}/>; const view = props.role === 'secretaire' ? (props.section === 'capacites' ? <ClassCapacityPanel classes={props.secretaryClasses} updateCapacity={props.updateClassCapacity} loadClass={props.loadClass} setSection={props.setSection}/> : props.section === 'classes' ? <ClassRegistry {...props} editable/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <SecretaryHome {...props}/>) : props.role === 'comptable' ? (
   props.section === 'inscriptions' ? <><Enroll {...props}/><StudentImportPanel/></>
   : props.section === 'finances' ? <FinanceSettings {...props}/>
   : props.section === 'caisse' ? <Accountant {...props}/>
@@ -226,7 +272,7 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
                   <h4 className="font-semibold text-slate-800">{group.label}</h4>
                   <p className="mt-1 text-sm text-slate-600">Tarif annuel : {money(group.plan.montantTotal)}</p>
                   <ul className="mt-3 space-y-1 text-xs text-slate-500">
-                    {group.plan.tranches.map((t, i) => <li key={t.id || i}>{t.nom} — {money(t.montant)} · Échéance {t.dateEcheance}</li>)}
+                     {group.plan.tranches.map((t, i) => <li key={t.id || i}>{t.nom || draft.tranches[i]?.nom || `Tranche ${i + 1}`} — {money(t.montant)} · Échéance : {draft.tranches[i]?.dateEcheance || 'Date non définie'}</li>)}
                   </ul>
                 </div>
               ))}
@@ -331,8 +377,12 @@ function FinanceSettings({ finance, saveFinancialConfiguration, establishmentTyp
     </>
   );
 }
-function SecretaryHome({ secretaryClasses, setSection, loadClass }) {
-  const classes = sortClasses(secretaryClasses);
+function SecretaryHome({ secretaryClasses, setSection }) {
+  const classes = useMemo(() => sortClasses(secretaryClasses), [secretaryClasses]);
+  const [capacitySearch, setCapacitySearch] = useState('');
+  const capacityMatches = capacitySearch.trim()
+    ? classes.filter((item) => matchClassSearch(item, capacitySearch))
+    : [];
   const totalStudents = classes.reduce((total, item) => total + Number(item.effectif || 0), 0);
   const emptyClasses = classes.filter((item) => Number(item.effectif || 0) === 0).length;
 
@@ -364,54 +414,93 @@ function SecretaryHome({ secretaryClasses, setSection, loadClass }) {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h3 className="font-semibold text-slate-900">Effectifs par niveau</h3>
-              <p className="mt-1 text-xs text-slate-500">
-                Sélectionnez « Gérer les classes » pour accéder aux groupes/séries en détail.
-              </p>
+        <div className="space-y-5">
+          <div>
+            <div className="relative max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                aria-label="Rechercher une classe pour afficher sa capacité"
+                className="block h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={capacitySearch}
+                onChange={(event) => setCapacitySearch(event.target.value)}
+                placeholder="Rechercher : CI, CM1, CM2..."
+              />
             </div>
-
-            <button
-              type="button"
-              onClick={() => setSection('classes')}
-              className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
-            >
-              Gérer les classes
-            </button>
+            {capacitySearch.trim() && (
+              <div className="mt-3 divide-y divide-slate-100">
+                {capacityMatches.length ? capacityMatches.map((item) => {
+                  const hasCapacity = item.capacite !== null && item.capacite !== undefined && item.capacite !== '';
+                  const capacity = hasCapacity ? Number(item.capacite) : null;
+                  const effectif = Number(item.effectif || 0);
+                  const remaining = hasCapacity ? Math.max(capacity - effectif, 0) : null;
+                  const complete = hasCapacity && remaining === 0;
+                  return (
+                    <div key={item.id} className="flex items-center justify-between gap-3 py-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{item.code_affichage}</p>
+                        <p className="text-xs text-slate-500">
+                          {hasCapacity ? `Capacité : ${capacity}` : 'Capacité non définie'} · {effectif} élève(s)
+                        </p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${!hasCapacity ? 'bg-slate-100 text-slate-600' : complete ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {!hasCapacity ? 'Non définie' : complete ? 'Complet' : `${remaining} place(s) restante(s)`}
+                      </span>
+                    </div>
+                  );
+                }) : <p className="py-3 text-xs text-slate-500">Aucune classe ne correspond à la recherche.</p>}
+              </div>
+            )}
           </div>
 
-          {levels.length ? (
-            <div className="divide-y divide-slate-100">
-              {levels.map((level) => (
-                <div
-                  key={level.label}
-                  className="flex w-full items-center justify-between gap-4 py-4"
-                >
-                  <p className="font-semibold text-slate-800">{level.label}</p>
-                  <span className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
-                    {level.effectif} élève(s)
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-slate-200 p-5">
-              <p className="text-sm font-medium text-slate-700">Aucune classe annuelle.</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Créez les classes après l'activation de l'année scolaire par le Directeur.
-              </p>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-slate-900">Effectifs par niveau</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Sélectionnez « Gérer les classes » pour accéder aux groupes/séries en détail.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setSection('classes')}
-                className="mt-4 text-sm font-semibold text-emerald-700"
+                className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
               >
-                Créer une classe
+                Gérer les classes
               </button>
             </div>
-          )}
-        </section>
+
+            {levels.length ? (
+              <div className="divide-y divide-slate-100">
+                {levels.map((level) => (
+                  <div
+                    key={level.label}
+                    className="flex w-full items-center justify-between gap-4 py-4"
+                  >
+                    <p className="font-semibold text-slate-800">{level.label}</p>
+                    <span className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
+                      {level.effectif} élève(s)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 p-5">
+                <p className="text-sm font-medium text-slate-700">Aucune classe annuelle.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Créez les classes après l'activation de l'année scolaire par le Directeur.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSection('classes')}
+                  className="mt-4 text-sm font-semibold text-emerald-700"
+                >
+                  Créer une classe
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
 
         <aside className="space-y-5">
           <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
@@ -456,11 +545,68 @@ function Modal({ title, onClose, children }) {
     </div>
   );
 }
+function ClassCapacityPanel({ classes = [], updateCapacity, loadClass, setSection }) {
+  const [values, setValues] = useState({});
+  const [editingId, setEditingId] = useState(null);
+  const [search, setSearch] = useState('');
+  const { classes: visible, loading, error } = useSecretaryClassSearch(classes, search);
+  const save = async (id) => {
+    await updateCapacity(id, values[id] === '' ? null : Number(values[id]));
+    setEditingId(null);
+  };
+
+  return <>
+    <Title title="Capacité des classes" subtitle="Recherchez une classe pour consulter ses places disponibles." />
+    <div className="mb-4 relative w-full max-w-sm">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <input
+        type="text"
+        className="block h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Rechercher une classe, par exemple CI"
+      />
+    </div>
+    {loading && <p className="mb-3 text-xs text-slate-500">Recherche des classes…</p>}
+    {error && <p role="alert" className="mb-3 text-xs text-rose-700">{error}</p>}
+    <div className="grid gap-3 lg:grid-cols-2">
+      {visible.map((item) => {
+        const capacity = item.capacite ?? '';
+        const current = Number(item.effectif || 0);
+        const remaining = capacity === '' ? 0 : Math.max(Number(capacity) - current, 0);
+        const status = capacity === '' ? 'non-definie' : remaining === 0 ? 'complet' : 'disponible';
+        const editing = editingId === item.id;
+
+        return <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <button type="button" onClick={async () => { await loadClass(item.id); setSection('classes'); }} className="flex w-full items-center justify-between text-left">
+            <div><p className="font-semibold text-slate-900">{item.code_affichage}</p><p className="text-xs text-slate-500">{current} élève(s) · {capacity === '' ? 'Capacité non définie' : `${remaining} place(s) restante(s)`}</p></div>
+            <div className="flex flex-col items-end gap-1">
+              <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${status === 'disponible' ? 'bg-emerald-100 text-emerald-700' : status === 'complet' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{status === 'disponible' ? 'Disponible' : status === 'complet' ? 'Complet' : 'Capacité non définie'}</span>
+              <span className="text-xs text-slate-400">{item.site_nom}</span>
+            </div>
+          </button>
+          <div className="mt-3 flex items-end gap-2">
+            <div className="flex-1">
+              {editing
+                ? <Input label="Capacité" type="number" min="0" value={values[item.id] ?? capacity} onChange={(event) => setValues({ ...values, [item.id]: event.target.value })} />
+                : <p className="text-sm text-slate-600">Capacité : <span className="font-semibold">{capacity === '' ? 'Non définie' : capacity}</span></p>}
+            </div>
+            {editing
+              ? <button type="button" onClick={() => save(item.id)} className="rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white">Enregistrer</button>
+              : <button type="button" onClick={() => { setEditingId(item.id); setValues({ ...values, [item.id]: capacity }); }} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-600" title="Modifier la capacité">✎ Modifier</button>}
+          </div>
+        </div>;
+      })}
+    </div>
+    {!loading && !error && !visible.length && <Empty>Aucune classe ne correspond à la recherche.</Empty>}
+  </>;
+}
 function ClassRegistry({ editable, secretaryClasses, censeurClasses, classDetail, loadClass, setClassDetail, classForm, setClassForm, createClass, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent, establishmentName, establishmentType }) {
   const classes = editable ? secretaryClasses : censeurClasses;
   const [search, setSearch] = useState('');
   const q = search.trim();
-  const visibleClasses = q ? classes.filter((item) => matchClassSearch(item, q)) : classes;
+  const { classes: searchedClasses, loading: searchLoading, error: searchError } = useSecretaryClassSearch(classes, search, editable);
+  const visibleClasses = editable ? searchedClasses : q ? classes.filter((item) => matchClassSearch(item, q)) : classes;
   const level = classForm.nom.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s/g, '');
   const automaticType = ['ci', 'cp', 'ce1', 'ce2', 'cm1', 'cm2', '6', '6e', '6eme', '5', '5e', '5eme', '4', '4e', '4eme', '3', '3e', '3eme'].includes(level) ? 'groupe' : ['2nde', '2nd', 'seconde', '1ere', '1re', 'tle', 'terminale'].includes(level) ? 'serie' : '';
   const isThird = ['3', '3e', '3eme'].includes(level);
@@ -477,7 +623,9 @@ function ClassRegistry({ editable, secretaryClasses, censeurClasses, classDetail
   return <>
     <Title title="Classes et élèves" subtitle={editable ? 'Créez une classe, puis ouvrez-la pour gérer les fiches élèves.' : 'Consultation des classes et des élèves.'}/>
     {editable && <Panel title="Créer une classe annuelle"><form onSubmit={createClass} className="grid sm:grid-cols-4 gap-3"><Input label="Classe" placeholder={establishmentType === 'primaire' ? 'CI, CP ou CM2' : '6ème'} value={classForm.nom} onChange={(e) => updateName(e.target.value)} required/>{automaticType && <Input label={divisionLabel} placeholder={automaticType === 'groupe' ? 'A' : 'D'} value={classForm.divisionNom} onChange={(e) => setClassForm({ ...classForm, divisionNom: e.target.value, divisionType: automaticType })}/>} {isThird && <><label className="text-sm">Type<select className="input" value={classForm.divisionType} onChange={(e) => setClassForm({ ...classForm, divisionType: e.target.value, divisionNom: '' })}><option value="">Choisir</option><option value="groupe">Groupe</option><option value="serie">Série</option></select></label><Input label={divisionLabel} placeholder="Valeur" value={classForm.divisionNom} onChange={(e) => setClassForm({ ...classForm, divisionNom: e.target.value })}/></>}<button className="primary self-end">Créer la classe</button></form>{automaticType && <p className="mt-3 text-xs text-slate-500">{establishmentType === 'primaire' ? 'Au primaire, les niveaux CI à CM2 sont organisés par groupes.' : automaticType === 'groupe' ? 'De la 6ème à la 3ème, la séparation est un groupe.' : 'De la 2nde à la Terminale, la séparation est une série.'}</p>}</Panel>}
-    <div className="mb-4 flex items-center gap-3"><div className="relative flex-1"><Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"/><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une classe, un niveau, un site" className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div></div>
+    <div className="mb-4 flex items-center gap-3"><div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"/><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une classe, un niveau, un site" className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div></div>
+    {searchLoading && <p className="mb-2 text-xs text-slate-500">Recherche des classes…</p>}
+    {searchError && <p role="alert" className="mb-2 text-xs text-rose-700">{searchError}</p>}
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">{visibleClasses.length ? <div className="divide-y divide-slate-100">{sortClasses(visibleClasses).map((item) => <button key={item.id} type="button" onClick={() => loadClass(item.id)} className="flex w-full items-center gap-4 px-4 py-3 text-left transition hover:bg-emerald-50/40"><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${editable ? 'bg-emerald-50 text-emerald-600' : 'bg-violet-50 text-violet-600'}`}><School className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-900">{item.code_affichage}</span><span className="block truncate text-xs text-slate-500">{establishmentName || item.site_nom || 'Établissement'}</span></span><span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-slate-600"><Users className="h-3.5 w-3.5" />{item.effectif || 0} élève(s)</span><ChevronLeft className="h-4 w-4 rotate-180 text-slate-300" /></button>)}</div> : <div className="p-5"><Empty>{q ? 'Aucune classe ne correspond à la recherche.' : 'Aucune classe annuelle. Le directeur doit d’abord activer l’année scolaire.'}</Empty></div>}</div>
   </>;
 }
@@ -521,6 +669,7 @@ function ClassStudents({ editable, classes, classDetail, setClassDetail, editing
               <option value="">Choisir</option>
               {classes.filter((item) => item.id !== classDetail.classInfo.id).map((item) => <option key={item.id} value={item.id}>{item.code_affichage}{item.site_nom ? ` — ${item.site_nom}` : ''}</option>)}
             </select>
+            {(() => { const destination = classes.find((item) => item.id === transferStudent.destinationClassId); if (!destination) return null; const capacity = destination.capacite; const full = capacity === null || capacity === undefined || Number(destination.effectif || 0) >= Number(capacity); return full ? <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 sm:col-span-2">Cette classe est complète ou sa capacité n’est pas définie. Vous pouvez poursuivre, mais mettez à jour sa capacité dans « Capacité des classes » si nécessaire.</p> : <p className="text-xs text-emerald-700 sm:col-span-2">{Math.max(Number(capacity) - Number(destination.effectif || 0), 0)} place(s) restante(s).</p>; })()}
           </label>
           <label className="text-sm sm:col-span-2">Motif du transfert
             <textarea required minLength={3} className="input min-h-20" value={transferStudent.motif || ''} onChange={(event) => setTransferStudent({ ...transferStudent, motif: event.target.value })} placeholder="Ex. changement de groupe, demande des parents..." />
@@ -803,11 +952,11 @@ function Enroll({ enrollOptions, enrollForm, setEnrollForm, createEnrollment, fi
             <Input label="Matricule national" value={enrollForm.matricule} onChange={set('matricule')} required/>
             <Input label="Nom" value={enrollForm.nom} onChange={set('nom')} required/>
             <Input label="Prénom" value={enrollForm.prenom} onChange={set('prenom')} required/>
-            <Input label="Date de naissance" type="date" value={enrollForm.date_naissance} onChange={set('date_naissance')}/>
-            <Input label="Lieu de naissance" value={enrollForm.lieu_naissance} onChange={set('lieu_naissance')}/>
-            <Input label="Nationalité" value={enrollForm.nationalite} onChange={set('nationalite')}/>
+            <Input label="Date de naissance" type="date" value={enrollForm.date_naissance} onChange={set('date_naissance')} required/>
+            <Input label="Lieu de naissance" value={enrollForm.lieu_naissance} onChange={set('lieu_naissance')} required/>
+            <Input label="Nationalité" value={enrollForm.nationalite} onChange={set('nationalite')} required/>
             <Input label="Téléphone parent/tuteur" value={enrollForm.telephone} onChange={set('telephone')}/>
-            <label className="text-sm">Sexe<select className="input" value={enrollForm.sexe} onChange={set('sexe')}><option value="">Non renseigné</option><option value="M">Masculin</option><option value="F">Féminin</option></select></label>
+            <label className="text-sm">Sexe *<select required className="input" value={enrollForm.sexe} onChange={set('sexe')}><option value="">Non renseigné</option><option value="M">Masculin</option><option value="F">Féminin</option></select></label>
             <label className="text-sm">Classe<select required className="input" value={enrollForm.annualClassId} onChange={set('annualClassId')}><option value="">Choisir</option>{enrollOptions.classes.map((c) => <option key={c.id} value={c.id}>{c.code_affichage}</option>)}</select></label>
           </> : <>
             <div className="relative sm:col-span-2">
@@ -849,7 +998,7 @@ function Enroll({ enrollOptions, enrollForm, setEnrollForm, createEnrollment, fi
           </>}
 
           {applicableFees.length > 0 && <div className="sm:col-span-2">
-            <p className="mb-2 text-sm font-medium text-slate-700">Frais généraux à solder maintenant (espèces)</p>
+            <p className="mb-2 text-sm font-medium text-slate-700">Frais généraux à solder</p>
             <div className="space-y-2 rounded-lg border border-slate-200 p-3">
               {applicableFees.map((fee) => <label key={fee.id} className="flex items-center justify-between gap-3 text-sm">
                 <span className="flex items-center gap-2"><input type="checkbox" checked={(enrollForm.paidFeeConfigIds || []).includes(fee.id)} onChange={() => toggleFee(fee.id)} />{fee.nom}{!fee.obligatoire ? ' (facultatif)' : ''}</span>
@@ -974,5 +1123,5 @@ function Profile({ profile, setProfile, edit, setEdit, save, username, usernameL
 
   return <><Title title="Mon profil" subtitle="Consultez et mettez à jour vos informations personnelles"/><Panel title="Informations personnelles" action={!edit && <button type="button" onClick={() => setEdit(true)} className="text-sm font-semibold text-emerald-700">Modifier</button>}>{edit ? <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2"><Input label="Nom" value={profile.nom} onChange={set('nom')} required/><Input label="Prénom" value={profile.prenom} onChange={set('prenom')} required/><Input label="Email" type="email" value={profile.email} onChange={set('email')} required/><Input label="Téléphone" value={profile.telephone} onChange={set('telephone')}/><p className="text-xs text-slate-500 sm:col-span-2">L’identifiant est automatiquement formé du rôle et du nom, et suit les changements de nom.</p><div className="flex gap-2 sm:col-span-2"><button className="primary">Enregistrer</button><button type="button" onClick={() => setEdit(false)} className="rounded-lg bg-slate-100 px-4 py-2.5 text-sm text-slate-700">Annuler</button></div></form> : <dl className="grid gap-4 text-sm sm:grid-cols-2"><Detail label="Nom" value={`${profile.prenom} ${profile.nom}`.trim() || 'Non renseigné'}/><Detail label="Identifiant" value={username || 'Non renseigné'}/><Detail label="Email" value={profile.email || 'Non renseigné'}/><Detail label="Téléphone" value={profile.telephone || 'Non renseigné'}/></dl>}</Panel></>;
 }
-function Security({ password, setPassword, save }) { const set = (key) => (e) => setPassword({ ...password, [key]: e.target.value }); return <><Title title="Sécurité" subtitle="Modifiez votre mot de passe à tout moment"/><Panel title="Modifier mon mot de passe"><form onSubmit={save} className="grid sm:grid-cols-2 gap-3"><Input label="Mot de passe actuel" type="password" value={password.currentPassword} onChange={set('currentPassword')} required/><div/><Input label="Nouveau mot de passe" type="password" value={password.newPassword} onChange={set('newPassword')} required/><Input label="Confirmer le nouveau mot de passe" type="password" value={password.confirmPassword} onChange={set('confirmPassword')} required/><button className="sm:col-span-2 bg-slate-800 text-white rounded-lg p-2.5 text-sm">Modifier le mot de passe</button></form></Panel></>; }
-function Title({ title, subtitle }) { return <div className="mb-6"><h2 className="text-2xl font-semibold">{title}</h2><p className="text-sm text-slate-500 mt-1">{subtitle}</p></div>; } function Panel({ title, action, children }) { return <section className="bg-white border rounded-xl p-6 mb-5"><div className="flex justify-between mb-5"><h3 className="font-semibold">{title}</h3>{action}</div>{children}</section>; } function Card({ icon, label, value, children }) { return <div className="bg-white border rounded-xl p-4"><div className="text-emerald-600 mb-3 w-5">{icon}</div><p className="text-xs text-slate-500">{label}</p><p className="font-semibold mt-1 truncate">{value}</p>{children}</div>; } function Input({ label, ...props }) { return <label className="block text-sm">{label}<input {...props} className="input"/></label>; } function Detail({ label, value }) { return <div><dt className="text-slate-500">{label}</dt><dd className="font-medium mt-1">{value}</dd></div>; } function Empty({ children }) { return <p className="text-sm text-slate-500">{children}</p>; } function Notice({ type = 'warning', children }) { const style = type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-700' : type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-800'; return <div className={`max-w-6xl mx-auto mb-5 p-4 border rounded-xl text-sm ${style}`}>{children}</div>; }
+function Security({ password, setPassword, save }) { const [visible, setVisible] = useState(false); const set = (key) => (e) => setPassword({ ...password, [key]: e.target.value }); const field = (label, key) => <label className="block text-sm">{label}<div className="relative"><input type={visible ? 'text' : 'password'} value={password[key]} onChange={set(key)} required className="input pr-20"/><button type="button" onClick={() => setVisible((value) => !value)} className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">{visible ? 'Masquer' : 'Afficher'}</button></div></label>; return <><Title title="Sécurité" subtitle="Modifiez votre mot de passe à tout moment"/><Panel title="Modifier mon mot de passe"><form onSubmit={save} className="grid sm:grid-cols-2 gap-3">{field('Mot de passe actuel', 'currentPassword')}<div/>{field('Nouveau mot de passe', 'newPassword')}{field('Confirmer le nouveau mot de passe', 'confirmPassword')}<p className="text-xs text-slate-500 sm:col-span-2">Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule et un chiffre.</p><button className="sm:col-span-2 bg-slate-800 text-white rounded-lg p-2.5 text-sm">Modifier le mot de passe</button></form></Panel></>; }
+function Title({ title, subtitle }) { return <div className="mb-6"><h2 className="text-2xl font-semibold">{title}</h2><p className="text-sm text-slate-500 mt-1">{subtitle}</p></div>; } function Panel({ title, action, children }) { return <section className="bg-white border rounded-xl p-6 mb-5"><div className="flex justify-between mb-5"><h3 className="font-semibold">{title}</h3>{action}</div>{children}</section>; } function Card({ icon, label, value, children }) { return <div className="bg-white border rounded-xl p-4"><div className="text-emerald-600 mb-3 w-5">{icon}</div><p className="text-xs text-slate-500">{label}</p><p className="font-semibold mt-1 truncate">{value}</p>{children}</div>; } function Input({ label, required, ...props }) { return <label className="block text-sm">{label}{required ? ' *' : ''}<input {...props} required={required} className="input"/></label>; } function Detail({ label, value }) { return <div><dt className="text-slate-500">{label}</dt><dd className="font-medium mt-1">{value}</dd></div>; } function Empty({ children }) { return <p className="text-sm text-slate-500">{children}</p>; } function Notice({ type = 'warning', children }) { const style = type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-700' : type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-800'; return <div className={`max-w-6xl mx-auto mb-5 p-4 border rounded-xl text-sm ${style}`}>{children}</div>; }

@@ -1,13 +1,16 @@
-import { Building2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Search, UserRound } from 'lucide-react';
+import { Archive, Building2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Search, UserRound } from 'lucide-react';
 import { PLATFORM_NAME } from '../config/branding';
 import { directionAPI } from '../services/api';
 import DirectorCockpit from './DirectorCockpit';
 import EstablishmentStudentsPanel from './EstablishmentStudentsPanel';
+import { YearArchives } from './SchoolYearPanel';
 
 export default function DirectorWorkspace({ user, establishmentName, cardService, onLogout, section, setSection, cockpitProps, content, error, notice }) {
+  const profileIncomplete = !user?.nom?.trim() || !user?.prenom?.trim() || !user?.email?.trim();
   const sites = cockpitProps?.direction?.sites || [];
   const navigation = [
     { id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> },
+    { id: 'archives', label: 'Archives', icon: <Archive className="h-4 w-4" /> },
     { id: 'recherche-eleve', label: 'Rechercher un élève', icon: <Search className="h-4 w-4" /> },
     ...(cardService?.actif ? [{ id: 'cartes', label: 'Cartes d’identité scolaire', icon: <Building2 className="h-4 w-4" /> }] : []),
     { id: 'profil', label: 'Mon profil', icon: <UserRound className="h-4 w-4" /> },
@@ -69,6 +72,7 @@ export default function DirectorWorkspace({ user, establishmentName, cardService
               Mot de passe initial encore actif : personnalisez-le dans « Sécurité ».
             </div>
           )}
+          {profileIncomplete && <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Votre nom, prénom et email sont obligatoires : complétez votre profil pour personnaliser votre identifiant et faciliter la réinitialisation du mot de passe.</div>}
 
                     {(error || notice) && (
             <div className="fixed inset-x-0 top-24 z-50 flex justify-center px-4 pointer-events-none">
@@ -80,7 +84,7 @@ export default function DirectorWorkspace({ user, establishmentName, cardService
             </div>
           )}
 
-          {section === 'tableau' ? <DirectorCockpit {...cockpitProps} /> : section === 'recherche-eleve' ? <div className="space-y-6"><div><h2 className="text-2xl font-semibold tracking-tight text-emerald-700">Rechercher un élève</h2><p className="mt-1 text-sm text-slate-500">Chaque site dispose de sa propre recherche et de sa pagination.</p></div>{sites.map((site) => <EstablishmentStudentsPanel key={site.id} title={site.nom} subtitle={`${site.est_principal ? 'Site principal' : 'Filiale'} · Recherche des élèves de ce site uniquement.`} fetchStudents={(search, page) => directionAPI.listStudents(search, page, site.id)} />)}</div> : content}
+          {section === 'tableau' ? <DirectorCockpit {...cockpitProps} /> : section === 'archives' ? <div className="space-y-6"><div><h2 className="text-2xl font-semibold tracking-tight text-emerald-700">Archives</h2><p className="mt-1 text-sm text-slate-500">Années clôturées, consultables en lecture seule.</p></div><YearArchives schoolYears={cockpitProps?.schoolYears || []} /></div> : section === 'recherche-eleve' ? <div className="space-y-6"><div><h2 className="text-2xl font-semibold tracking-tight text-emerald-700">Rechercher un élève</h2><p className="mt-1 text-sm text-slate-500">Chaque site dispose de sa propre recherche et de sa pagination.</p></div>{sites.map((site) => <EstablishmentStudentsPanel key={site.id} title={site.nom} subtitle={`${site.est_principal ? 'Site principal' : 'Filiale'} · Recherche des élèves de ce site uniquement.`} fetchStudents={(search, page) => directionAPI.listStudents(search, page, site.id)} />)}</div> : content}
         </div>
       </div>
     </main>

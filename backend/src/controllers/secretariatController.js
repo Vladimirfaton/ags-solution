@@ -16,7 +16,16 @@ export const listStudents = async (req, res, next) => {
   try { res.json({ students: await StudentRegistry.list(req.query.recherche || '', await accessScopeFor(req.user)) }); } catch (error) { next(error); }
 };
 export const listClasses = async (req, res, next) => {
-  try { res.json(await AcademicStructure.listAnnualClasses(await accessScopeFor(req.user))); } catch (error) { next(error); }
+  try { res.json(await AcademicStructure.listAnnualClasses(await accessScopeFor(req.user), req.query.recherche || '')); } catch (error) { next(error); }
+};
+export const updateClassCapacity = async (req, res, next) => {
+  try {
+    const capacity = req.body.capacite === null || req.body.capacite === '' ? null : Number(req.body.capacite);
+    if (capacity !== null && (!Number.isInteger(capacity) || capacity < 0)) return res.status(400).json({ error: 'La capacité doit être un entier positif ou vide.' });
+    const classe = await AcademicStructure.updateCapacity(req.params.classId, capacity, await accessScopeFor(req.user));
+    if (!classe) return res.status(404).json({ error: 'Classe introuvable ou non autorisée.' });
+    res.json({ classe });
+  } catch (error) { next(error); }
 };
 export const listStudentsByClass = async (req, res, next) => {
   try { res.json(await StudentRegistry.listByClass(req.params.classId, await accessScopeFor(req.user))); } catch (error) { next(error); }

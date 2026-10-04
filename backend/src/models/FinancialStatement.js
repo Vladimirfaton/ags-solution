@@ -112,6 +112,53 @@ const baseCte = (filterSql) => `
 `;
 
 export class FinancialStatement {
+  static async studentDetails(studentId, scope) {
+    const siteFilter = scope.allSites ? { sql: '', params: [] } : { sql: ' AND i.site_id = ANY($2::uuid[])', params: [scope.siteIds] };
+    const result = await query(`
+      SELECT e.id, e.matricule, e.nom, e.prenom, e.sexe, ca.code_affichage AS classe,
+        a.libelle AS annee, o.id AS obligation_id, o.libelle, o.montant_du,
+        TO_CHAR(o.date_echeance, 'YYYY-MM-DD') AS date_echeance,
+        COALESCE(SUM(ap.montant_affecte) FILTER (WHERE p.statut = 'confirme'), 0) AS montant_paye
+      FROM eleves e
+      JOIN inscriptions i ON i.eleve_id = e.id AND i.statut = 'active'
+        AND i.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')${siteFilter.sql}
+      JOIN annees_scolaires a ON a.id = i.annee_scolaire_id
+      LEFT JOIN affectations_inscription ai ON ai.inscription_id = i.id AND ai.active = true
+      LEFT JOIN classes_annuelles ca ON ca.id = ai.classe_annuelle_id
+      LEFT JOIN obligations_financieres o ON o.inscription_id = i.id
+        AND o.type = 'tranche_scolarite'
+        AND EXISTS (
+          SELECT 1
+          FROM affectations_inscription ai_current
+          JOIN classes_annuelles ca_current ON ca_current.id = ai_current.classe_annuelle_id
+          JOIN plans_tarifaires pt_current ON pt_current.annee_scolaire_id = i.annee_scolaire_id
+            AND pt_current.site_id = i.site_id
+            AND pt_current.classe_id = ca_current.classe_id
+            AND pt_current.division_nom IS NOT DISTINCT FROM ca_current.division_nom
+            AND pt_current.actif = true
+          JOIN tranches_tarifaires tt_current ON tt_current.plan_tarifaire_id = pt_current.id
+            AND tt_current.id = o.source_config_id
+            AND tt_current.actif = true
+          WHERE ai_current.inscription_id = i.id AND ai_current.active = true
+        )
+      LEFT JOIN affectations_paiement ap ON ap.obligation_financiere_id = o.id
+      LEFT JOIN paiements p ON p.id = ap.paiement_id
+      WHERE e.id = $1
+      GROUP BY e.id, i.id, ca.code_affichage, a.libelle, o.id
+      ORDER BY o.ordre`, [studentId, ...siteFilter.params]);
+    if (!result.rowCount) return null;
+    const first = result.rows[0];
+    return {
+      student: { id: first.id, matricule: first.matricule, nom: first.nom, prenom: first.prenom, sexe: first.sexe, classe: first.classe, annee: first.annee },
+      tranches: result.rows.filter((row) => row.obligation_id).map((row) => {
+        const montantDu = Number(row.montant_du);
+        const montantPaye = Number(row.montant_paye);
+        const reste = Math.max(montantDu - montantPaye, 0);
+        return { id: row.obligation_id, libelle: row.libelle, montantDu, montantPaye, reste, dateEcheance: row.date_echeance, statut: reste <= 0 ? 'solde' : montantPaye > 0 ? 'partiel' : 'impaye' };
+      }),
+    };
+  }
+
   static async summary(scope, options = {}) {
     const establishment = await query('SELECT type FROM etablissement WHERE singleton = true');
     const levels = allowedLevelCodes(establishment.rows[0]?.type);

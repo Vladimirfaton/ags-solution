@@ -35,6 +35,14 @@ textarea {
   border-radius: 0.5rem;
 }
 
+.input.pl-9 {
+  padding-left: 2.25rem;
+}
+
+.relative > svg.absolute {
+  pointer-events: none;
+}
+
 .primary {
   background: #059669;
   color: white;
@@ -63,4 +71,3 @@ textarea {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
-

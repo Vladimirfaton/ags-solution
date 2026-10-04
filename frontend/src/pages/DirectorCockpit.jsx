@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Building2, CalendarDays, IdCard, MapPin, School, Users } from 'lucide-react';
-import SchoolYearPanel, { YearArchives } from './SchoolYearPanel';
+import SchoolYearPanel from './SchoolYearPanel';
 const formatNumber = (value) => Number(value || 0).toLocaleString('fr-FR');
 const classRank = (value = '') => {
   const level = value
@@ -101,7 +101,6 @@ export default function DirectorCockpit({ direction, schoolYears = [], yearForm,
               </div>
               )) : <p className="col-span-full text-xs text-slate-500">Aucune classe active sur ce site.</p>}</div></div>) : <EmptyState>Aucune classe active pour le moment.</EmptyState>}
           </section>
-          <YearArchives schoolYears={schoolYears} />
         </div>
 
         <aside className="space-y-5">

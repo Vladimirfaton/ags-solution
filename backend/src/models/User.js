@@ -54,6 +54,7 @@ static async setProfile(userId, { nom, prenom, email, telephone, username: reque
   if (!current) return null;
   const cleanNom = nom?.trim() || null;
   const cleanPrenom = prenom?.trim() || null;
+  const cleanEmail = email?.trim().toLowerCase() || null;
   if (!cleanNom || !cleanPrenom) throw Object.assign(new Error('Le nom et le prénom sont requis.'), { status: 400, expose: true });
   if (`${current.role}-${cleanNom}`.length > 100) throw Object.assign(new Error('Le nom est trop long pour former l’identifiant.'), { status: 400, expose: true });
   let username = current.username;
@@ -80,8 +81,9 @@ static async setProfile(userId, { nom, prenom, email, telephone, username: reque
     }
   }
 
+  if (!cleanEmail) throw Object.assign(new Error('Le nom, le prénom et l’email sont requis.'), { status: 400, expose: true });
   const result = await query(`UPDATE users SET username = $1, username_locked = $2, nom = $3, prenom = $4, email = $5, telephone = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7 RETURNING id, email, role, username, username_locked, nom, prenom, telephone, password_personalized`,
-    [username, usernameLocked, cleanNom, cleanPrenom, email?.trim().toLowerCase() || null, telephone?.trim() || null, userId]);
+    [username, usernameLocked, cleanNom, cleanPrenom, cleanEmail, telephone?.trim() || null, userId]);
   return result.rows[0];
 }
   static async changePassword(userId, currentPassword, newPassword) {

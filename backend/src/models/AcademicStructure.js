@@ -15,14 +15,24 @@ export class AcademicStructure {
     ]);
     return { year: year.rows[0] || null, site: { id: resolvedSiteId } };
   }
-  static async listAnnualClasses(scope) {
+  static async listAnnualClasses(scope, search = '') {
     const context = await this.context(scope);
     if (!context.year) return { ...context, classes: [] };
     const establishment = await query('SELECT type FROM etablissement WHERE singleton = true');
     const allowedLevels = establishment.rows[0]?.type === 'primaire' ? ['CI', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'] : ['6e', '5e', '4e', '3e', '2nde', '1ere', 'terminale'];
     const siteFilter = scopedWhere(scope, 'ca.site_id', 3);
-    const result = await query(`SELECT ca.id, ca.code_affichage, ca.division_nom, ca.division_type, ca.actif, s.nom AS site_nom, n.ordre, n.libelle AS niveau_libelle, COUNT(ai.id)::int AS effectif FROM classes_annuelles ca JOIN classes c ON c.id = ca.classe_id JOIN niveaux_scolaires n ON n.id = c.niveau_id JOIN sites s ON s.id = ca.site_id LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true WHERE ca.annee_scolaire_id = $1 AND n.code = ANY($2::text[])${siteFilter.sql} GROUP BY ca.id, s.nom, n.ordre, n.libelle ORDER BY n.ordre, ca.division_nom`, [context.year.id, allowedLevels, ...siteFilter.params]);
+    const term = search.trim();
+    const searchFilter = term
+      ? ` AND (ca.code_affichage ILIKE $${3 + siteFilter.params.length} OR n.code ILIKE $${3 + siteFilter.params.length} OR n.libelle ILIKE $${3 + siteFilter.params.length} OR ca.division_nom ILIKE $${3 + siteFilter.params.length} OR s.nom ILIKE $${3 + siteFilter.params.length})`
+      : '';
+    const params = [context.year.id, allowedLevels, ...siteFilter.params, ...(term ? [`%${term}%`] : [])];
+    const result = await query(`SELECT ca.id, ca.code_affichage, ca.division_nom, ca.division_type, ca.actif, ca.capacite, s.nom AS site_nom, n.ordre, n.code AS niveau_code, n.libelle AS niveau_libelle, COUNT(ai.id)::int AS effectif FROM classes_annuelles ca JOIN classes c ON c.id = ca.classe_id JOIN niveaux_scolaires n ON n.id = c.niveau_id JOIN sites s ON s.id = ca.site_id LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true WHERE ca.annee_scolaire_id = $1 AND n.code = ANY($2::text[])${siteFilter.sql}${searchFilter} GROUP BY ca.id, s.nom, n.ordre, n.code, n.libelle ORDER BY n.ordre, ca.division_nom`, params);
     return { ...context, classes: result.rows };
+  }
+  static async updateCapacity(classId, capacity, scope) {
+    const siteFilter = scope.allSites ? { sql: '', params: [] } : { sql: ' AND site_id = ANY($3::uuid[])', params: [scope.siteIds] };
+    const result = await query(`UPDATE classes_annuelles SET capacite = $1 WHERE id = $2 AND annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active')${siteFilter.sql} RETURNING id, capacite`, scope.allSites ? [capacity, classId] : [capacity, classId, ...siteFilter.params]);
+    return result.rows[0] || null;
   }
   static async createAnnualClass({ niveauCode, divisionNom, divisionType, siteId }, scope) {
     const context = await this.context(scope, siteId);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Archive, ChevronLeft } from 'lucide-react';
+import { Archive, ChevronLeft, Search } from 'lucide-react';
 import { directionAPI } from '../services/api';
 
 const formatMonth = (value) => (value ? new Date(value).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : '');
@@ -103,11 +103,14 @@ export function YearArchives({ schoolYears = [] }) {
   const [classes, setClasses] = useState([]);
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState('');
-
-  if (!archived.length) return null;
+  const [classSearch, setClassSearch] = useState('');
+  const [siteFilter, setSiteFilter] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentPage, setStudentPage] = useState(1);
+  const pageSize = 10;
 
   const openArchive = async (year) => {
-    setError(''); setDetail(null);
+    setError(''); setDetail(null); setClassSearch(''); setSiteFilter(''); setStudentSearch(''); setStudentPage(1);
     try {
       const { data } = await directionAPI.listYearClasses(year.id);
       setClasses(data.classes || []);
@@ -115,11 +118,22 @@ export function YearArchives({ schoolYears = [] }) {
     } catch { setError('Impossible de charger cette archive.'); }
   };
   const openClass = async (classId) => {
-    setError('');
+    setError(''); setStudentSearch(''); setStudentPage(1);
     try { setDetail((await directionAPI.listArchivedClassStudents(classId)).data); }
     catch { setError('Impossible de charger cette classe.'); }
   };
-  const back = () => { if (detail) setDetail(null); else setOpenYear(null); };
+  const back = () => { if (detail) { setDetail(null); setStudentSearch(''); setStudentPage(1); } else { setOpenYear(null); setClasses([]); } };
+  const sites = [...new Set(classes.map((item) => item.site_nom).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const visibleClasses = classes.filter((item) => {
+    const term = classSearch.trim().toLowerCase();
+    return (!term || item.code_affichage.toLowerCase().includes(term)) && (!siteFilter || item.site_nom === siteFilter);
+  });
+  const visibleStudents = detail?.students?.filter((student) => {
+    const term = studentSearch.trim().toLowerCase();
+    return !term || [student.matricule, student.nom, student.prenom].filter(Boolean).some((value) => value.toLowerCase().includes(term));
+  }) || [];
+  const totalStudentPages = Math.max(1, Math.ceil(visibleStudents.length / pageSize));
+  const pagedStudents = visibleStudents.slice((studentPage - 1) * pageSize, studentPage * pageSize);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -143,11 +157,17 @@ export function YearArchives({ schoolYears = [] }) {
         </div>
       )}
 
+      {!openYear && !archived.length && <p className="rounded-xl border border-dashed border-slate-200 p-5 text-sm text-slate-500">Aucune année scolaire archivée pour le moment. Cette section sera alimentée lors de la clôture de la première année.</p>}
+
       {openYear && !detail && (
         <>
+          <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+            <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={classSearch} onChange={(event) => setClassSearch(event.target.value)} placeholder="Rechercher une classe" className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:bg-white" /></label>
+            <select value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-emerald-500"><option value="">Tous les sites</option>{sites.map((site) => <option key={site} value={site}>{site}</option>)}</select>
+          </div>
           <p className="mb-3 text-sm font-semibold text-slate-700">Année {openYear.libelle}</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {classes.length ? classes.map((item) => (
+            {visibleClasses.length ? visibleClasses.map((item) => (
               <button key={item.id} type="button" onClick={() => openClass(item.id)} className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 text-left transition hover:border-emerald-300">
                 <p className="font-semibold text-slate-800">{item.code_affichage}</p>
                 <p className="mt-2 text-xs text-slate-500">{item.effectif} élève(s)</p>
@@ -161,6 +181,10 @@ export function YearArchives({ schoolYears = [] }) {
       {detail && (
         <>
           <p className="mb-3 text-sm font-semibold text-slate-700">{detail.classInfo.code_affichage} · {openYear.libelle}</p>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <label className="relative block sm:max-w-md sm:flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={studentSearch} onChange={(event) => { setStudentSearch(event.target.value); setStudentPage(1); }} placeholder="Rechercher par nom, prénom ou matricule" className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:bg-white" /></label>
+            <span className="text-xs text-slate-500">{visibleStudents.length} élève(s) trouvé(s)</span>
+          </div>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full border-collapse text-left text-xs">
               <thead className="bg-slate-50">
@@ -169,7 +193,7 @@ export function YearArchives({ schoolYears = [] }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {detail.students.length ? detail.students.map((student) => (
+                {pagedStudents.length ? pagedStudents.map((student) => (
                   <tr key={student.id} className="text-slate-700">
                     <td className="px-3 py-2 font-medium text-slate-900">{student.matricule}</td>
                     <td className="px-3 py-2 font-semibold text-slate-900">{student.nom}</td>
@@ -180,6 +204,7 @@ export function YearArchives({ schoolYears = [] }) {
               </tbody>
             </table>
           </div>
+          <div className="mt-4 flex items-center justify-between gap-3 text-xs text-slate-500"><span>Page {Math.min(studentPage, totalStudentPages)} / {totalStudentPages}</span><div className="flex gap-2"><button type="button" disabled={studentPage <= 1} onClick={() => setStudentPage((page) => Math.max(1, page - 1))} className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold disabled:opacity-40">Précédente</button><button type="button" disabled={studentPage >= totalStudentPages} onClick={() => setStudentPage((page) => Math.min(totalStudentPages, page + 1))} className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold disabled:opacity-40">Suivante</button></div></div>
         </>
       )}
     </section>

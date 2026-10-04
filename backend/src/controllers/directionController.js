@@ -2,6 +2,7 @@ import { Establishment } from '../models/Establishment.js';
 import { AcademicStructure } from '../models/AcademicStructure.js';
 import { FinancialConfiguration } from '../models/FinancialConfiguration.js';
 import { accessScopeFor } from '../models/AccessScope.js';
+import { FinancialStatement } from '../models/FinancialStatement.js';
 
 export const getOverview = async (_req, res, next) => {
   try { res.json(await Establishment.directorOverview()); } catch (error) { next(error); }
@@ -94,5 +95,12 @@ export const getEstablishmentStudents = async (req, res, next) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
     res.json(await StudentRegistry.listForEstablishment(req.query.recherche || '', await accessScopeFor(req.user), page, pageSize, req.query.siteId || null));
+  } catch (error) { next(error); }
+};
+export const getStudentFinancialDetails = async (req, res, next) => {
+  try {
+    const details = await FinancialStatement.studentDetails(req.params.studentId, await accessScopeFor(req.user));
+    if (!details) return res.status(404).json({ error: 'Élève introuvable.' });
+    res.json(details);
   } catch (error) { next(error); }
 };

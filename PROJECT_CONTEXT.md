@@ -379,6 +379,7 @@ Le chantier de transition vers `Establishment` / `AcademicStructure` n'est pas e
 - certaines requêtes ou interfaces peuvent encore attendre l'ancien modèle ;
 - le collège doit être entièrement validé avec `niveau_id` ;
 - le primaire `CI` à `CM2` reste à brancher ;
+- la recherche `CI` dans l'espace secrétaire reste non résolue : l'utilisateur rapporte qu'une recherche `CI` ne retourne toujours aucun résultat sans préciser le groupe (par exemple `CI-A`). Des tentatives de recherche côté serveur et de fusion avec les résultats locaux ont été faites, mais le comportement n'est pas validé et le problème persiste. À reprendre ultérieurement en vérifiant le parcours réel de la requête et les données affichées dans « Capacité des classes » et « Classes et élèves » ;
 - l'ancien modèle `College` / `Class` doit être supprimé seulement après validation ;
 - l'activation Cartes doit être reliée au système de services, pas à l'ancien modèle ;
 - le flux obsolète d'activation de comptes par email sur ancien modèle ne doit pas être poursuivi.
@@ -534,7 +535,28 @@ Priorité immédiate :
 6. Corriger ou confirmer le build frontend, actuellement bloqué localement par `Cannot read directory "../..": Access is denied` dans esbuild Windows.
 7. Après branchement des interfaces, effectuer un test manuel multi-site : site A/site B, directeur et secrétaire, photos Storage, brouillon, observation et génération admin.
 
-### 17.7 Migrations et vérifications réalisées
+### 17.7 Vision future — préparation parallèle des années scolaires et archives
+
+Cette évolution est une vision fonctionnelle à traiter dans un chantier dédié, et ne constitue pas une correction immédiate.
+
+Le directeur doit pouvoir saisir la date de début d'une année scolaire et recevoir automatiquement une date de fin calculée à `date_debut + 9 mois`, tout en pouvant la modifier avant validation.
+
+La préparation de l'année suivante doit créer une année au statut `brouillon` sans remplacer l'année actuellement active. Les comptes de gestion autorisés doivent pouvoir choisir cette année préparatoire depuis leur propre espace et y effectuer les travaux nécessaires (par exemple préparation des classes, inscriptions ou réinscriptions), tout en continuant à consulter ou travailler dans l'année précédente selon leurs droits.
+
+Le système devra distinguer :
+
+- l'année active officielle de l'établissement ;
+- l'année de travail sélectionnée par chaque utilisateur ;
+- le statut de l'année (`brouillon`, `active`, `archivee`) ;
+- les actions autorisées selon le rôle et le statut de l'année.
+
+Lorsqu'une année est clôturée, elle doit devenir entièrement en lecture seule et rester consultable dans une section Archives. Chaque compte de gestion devra disposer d'une navigation adaptée à ses permissions pour sélectionner une année archivée et retrouver les informations de son périmètre. Les données historiques ne doivent pas être supprimées ni confondues avec les données de l'année active.
+
+État actuel à ne pas confondre avec cette vision : la base contient déjà le statut `archivee`, la clôture transforme l'année active en année archivée, et l'espace Directeur expose une consultation limitée des classes et élèves archivés. En revanche, les espaces Secrétaire, Comptable et Censeur restent actuellement dépendants de l'année `active` et ne proposent pas encore de contexte d'année sélectionnable ni de section Archives complète.
+
+Cette évolution nécessitera un chantier transversal : contexte d'année côté serveur, contrôle des permissions par année, remplacement progressif des requêtes dépendant implicitement de `statut = 'active'`, préparation contrôlée des structures et réinscriptions, clôture transactionnelle, interfaces par rôle et tests de non-écriture dans les archives.
+
+### 17.8 Migrations et vérifications réalisées
 
 Commandes validées :
 

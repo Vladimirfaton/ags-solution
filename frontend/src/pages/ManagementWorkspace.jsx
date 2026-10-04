@@ -2,12 +2,13 @@ import { AlertTriangle, Banknote, BookOpen, History as HistoryIcon, KeyRound, La
 import { PLATFORM_NAME } from '../config/branding';
 
 const workspaceMeta = {
-  secretaire: { title: 'Secrétariat', subtitle: 'Classes, élèves et dossiers scolaires', icon: <BookOpen className="h-5 w-5" />, menu: [{ id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> }, { id: 'classes', label: 'Classes et élèves', icon: <Users className="h-4 w-4" /> }, { id: 'assistance', label: 'Assistance', icon: <LifeBuoy className="h-4 w-4" /> }, { id: 'profil', label: 'Profil', icon: <UserRound className="h-4 w-4" /> }, { id: 'securite', label: 'Sécurité', icon: <KeyRound className="h-4 w-4" /> }] },
+  secretaire: { title: 'Secrétariat', subtitle: 'Classes, élèves et dossiers scolaires', icon: <BookOpen className="h-5 w-5" />, menu: [{ id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> }, { id: 'classes', label: 'Classes et élèves', icon: <Users className="h-4 w-4" /> }, { id: 'capacites', label: 'Capacité des classes', icon: <Users className="h-4 w-4" /> }, { id: 'assistance', label: 'Assistance', icon: <LifeBuoy className="h-4 w-4" /> }, { id: 'profil', label: 'Profil', icon: <UserRound className="h-4 w-4" /> }, { id: 'securite', label: 'Sécurité', icon: <KeyRound className="h-4 w-4" /> }] },
   comptable: { title: 'Comptabilité', subtitle: 'Inscriptions, frais et encaissements', icon: <Banknote className="h-5 w-5" />, menu: [{ id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> }, { id: 'inscriptions', label: 'Inscriptions', icon: <Users className="h-4 w-4" /> }, { id: 'finances', label: 'Frais et tarifs', icon: <Banknote className="h-4 w-4" /> }, { id: 'caisse', label: 'Caisse', icon: <Banknote className="h-4 w-4" /> },{ id: 'historique', label: 'Historique paiements', icon: <HistoryIcon className="h-4 w-4" /> },{ id: 'echeances', label: 'Échéances dépassées', icon: <AlertTriangle className="h-4 w-4" /> }, { id: 'assistance', label: 'Assistance', icon: <LifeBuoy className="h-4 w-4" /> }, { id: 'profil', label: 'Profil', icon: <UserRound className="h-4 w-4" /> }, { id: 'securite', label: 'Sécurité', icon: <KeyRound className="h-4 w-4" /> }] },
   censeur: { title: 'Censeur', subtitle: 'Suivi des élèves, classes et équipes pédagogiques', icon: <ShieldCheck className="h-5 w-5" />, menu: [{ id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> }, { id: 'classes', label: 'Classes et élèves', icon: <Users className="h-4 w-4" /> }, { id: 'pedagogie', label: 'Équipe pédagogique', icon: <UsersRound className="h-4 w-4" /> }, { id: 'assistance', label: 'Assistance', icon: <LifeBuoy className="h-4 w-4" /> }, { id: 'profil', label: 'Profil', icon: <UserRound className="h-4 w-4" /> }, { id: 'securite', label: 'Sécurité', icon: <KeyRound className="h-4 w-4" /> }] },
 };
 
 export default function ManagementWorkspace({ role, user, cardService, establishmentName, section, setSection, onLogout, content, error, notice }) {
+  const profileIncomplete = !user?.nom?.trim() || !user?.prenom?.trim() || !user?.email?.trim();
   const meta = workspaceMeta[role];
   const menu = role === 'secretaire' && cardService?.actif
     ? [...(meta?.menu || []), { id: 'cartes', label: 'Cartes d’identité scolaire', icon: <Users className="h-4 w-4" /> }]
@@ -22,7 +23,7 @@ export default function ManagementWorkspace({ role, user, cardService, establish
 
     <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <div className="shrink-0">
-        <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8"><div className="flex items-center justify-between gap-4"><div className="min-w-0"><h1 className="text-lg font-semibold text-slate-900">Espace {meta?.title}</h1><div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-500"><span className="max-w-[min(55vw,420px)] truncate rounded bg-emerald-50 px-2 py-1 font-semibold text-emerald-700" title={establishmentName || 'Établissement'}>{establishmentName || 'Établissement'}</span><span className="text-slate-300">•</span><span className="truncate">{meta?.subtitle}</span></div></div><div className="hidden max-w-48 truncate text-right sm:block"><p className="truncate text-sm font-semibold text-slate-800">{user?.prenom} {user?.nom}</p><p className="text-xs text-slate-500">{meta?.title}</p></div></div></header>
+        <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8"><div className="flex items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-600 text-white md:hidden">{meta?.icon}</span><div className="min-w-0"><h1 className="text-lg font-semibold text-slate-900">Espace {meta?.title}</h1><div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-500"><span className="max-w-[min(55vw,420px)] truncate rounded bg-emerald-50 px-2 py-1 font-semibold text-emerald-700" title={establishmentName || 'Établissement'}>{establishmentName || 'Établissement'}</span><span className="text-slate-300">•</span><span className="truncate">{meta?.subtitle}</span></div></div></div><div className="hidden max-w-48 truncate text-right sm:block"><p className="truncate text-sm font-semibold text-slate-800">{user?.prenom} {user?.nom}</p><p className="text-xs text-slate-500">{meta?.title}</p></div></div></header>
 
         <nav className="border-b border-slate-200 bg-white px-3 md:hidden">
           <div className="flex gap-1 overflow-x-auto">
@@ -51,6 +52,7 @@ export default function ManagementWorkspace({ role, user, cardService, establish
               Mot de passe initial encore actif : personnalisez-le dans « Sécurité ».
             </div>
           )}
+          {profileIncomplete && <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Votre nom, prénom et email sont obligatoires : complétez votre profil pour personnaliser votre identifiant et faciliter la réinitialisation du mot de passe.</div>}
 
                       {(error || notice) && (
               <div className="fixed inset-x-0 top-24 z-50 flex justify-center px-4 pointer-events-none">
