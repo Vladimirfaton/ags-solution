@@ -22,10 +22,14 @@ export class AcademicStructure {
     const allowedLevels = establishment.rows[0]?.type === 'primaire' ? ['CI', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'] : ['6e', '5e', '4e', '3e', '2nde', '1ere', 'terminale'];
     const siteFilter = scopedWhere(scope, 'ca.site_id', 3);
     const term = search.trim();
+    const searchIndex = 3 + siteFilter.params.length;
+    const normalizedTerm = term.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const searchSite = normalizedTerm.length >= 3 && !/^(ci|cp|ce1|ce2|cm1|cm2)(?![a-z])/.test(normalizedTerm);
+    const siteCondition = searchSite ? ` OR s.nom ILIKE $${searchIndex + 1} OR s.nom ILIKE $${searchIndex + 2}` : '';
     const searchFilter = term
-      ? ` AND (ca.code_affichage ILIKE $${3 + siteFilter.params.length} OR n.code ILIKE $${3 + siteFilter.params.length} OR n.libelle ILIKE $${3 + siteFilter.params.length} OR ca.division_nom ILIKE $${3 + siteFilter.params.length} OR s.nom ILIKE $${3 + siteFilter.params.length})`
+      ? ` AND (ca.code_affichage ILIKE $${searchIndex} OR n.code ILIKE $${searchIndex} OR n.libelle ILIKE $${searchIndex} OR ca.division_nom ILIKE $${searchIndex}${siteCondition})`
       : '';
-    const params = [context.year.id, allowedLevels, ...siteFilter.params, ...(term ? [`%${term}%`] : [])];
+    const params = [context.year.id, allowedLevels, ...siteFilter.params, ...(term ? [`%${term}%`, ...(searchSite ? [`${term}%`, `% ${term}%`] : [])] : [])];
     const result = await query(`SELECT ca.id, ca.code_affichage, ca.division_nom, ca.division_type, ca.actif, ca.capacite, s.nom AS site_nom, n.ordre, n.code AS niveau_code, n.libelle AS niveau_libelle, COUNT(ai.id)::int AS effectif FROM classes_annuelles ca JOIN classes c ON c.id = ca.classe_id JOIN niveaux_scolaires n ON n.id = c.niveau_id JOIN sites s ON s.id = ca.site_id LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true WHERE ca.annee_scolaire_id = $1 AND n.code = ANY($2::text[])${siteFilter.sql}${searchFilter} GROUP BY ca.id, s.nom, n.ordre, n.code, n.libelle ORDER BY n.ordre, ca.division_nom`, params);
     return { ...context, classes: result.rows };
   }

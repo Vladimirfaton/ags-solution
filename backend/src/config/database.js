@@ -16,18 +16,24 @@ export const supabase = createClient(
 );
 
 // ====== POSTGRESQL POOL (directe) ======
+const useSsl = process.env.NODE_ENV === 'production' || /supabase\.(com|co)/.test(process.env.DATABASE_URL || '');
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: useSsl ? { rejectUnauthorized: false } : false,
   max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 20000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 });
 
 pool.on('error', (err) => {
   console.error('Pool PostgreSQL error:', { code: err.code, message: err.message });
+});
+
+pool.query('SELECT 1').catch((err) => {
+  console.error('Préchauffage du pool échoué:', { code: err.code, message: err.message });
 });
 
 export const query = (text, params) => {

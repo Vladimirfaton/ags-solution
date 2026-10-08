@@ -33,7 +33,6 @@ export function matchClassSearch(item, query) {
     item?.code,
     item?.niveau_code,
     item?.code_niveau,
-    item?.site_nom,
     item?.niveau,
     item?.niveau_libelle,
     item?.division_nom,
@@ -43,6 +42,9 @@ export function matchClassSearch(item, query) {
 
   const matchesField = fields.some((value) => normalizeSearchText(value).includes(q));
   if (matchesField) return true;
+
+  const searchSite = q.length >= 3 && !/^(ci|cp|ce1|ce2|cm1|cm2)(?![a-z])/.test(q);
+  if (searchSite && ` ${normalizeSearchText(item?.site_nom)}`.includes(` ${q}`)) return true;
 
   const levelAliases = {
     primaire: ['ci', 'cp', 'ce1', 'ce2', 'cm1', 'cm2', 'cours d initiation', 'cours initiation'],

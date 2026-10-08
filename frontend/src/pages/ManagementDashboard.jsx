@@ -20,49 +20,14 @@ const classRank = (value = '') => { const level = value.toLowerCase().normalize(
 const sortClasses = (classes = []) => [...classes].sort((a, b) => { const rank = classRank(a.code_affichage) - classRank(b.code_affichage); return rank || a.code_affichage.localeCompare(b.code_affichage, 'fr', { numeric: true, sensitivity: 'base' }); });
 const classLevelCode = (value = '') => { const normalized = value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s/g, ''); if (['ci', 'cp', 'ce1', 'ce2', 'cm1', 'cm2'].includes(normalized)) return normalized.toUpperCase(); if (['6', '6e', '6eme'].includes(normalized)) return '6e'; if (['5', '5e', '5eme'].includes(normalized)) return '5e'; if (['4', '4e', '4eme'].includes(normalized)) return '4e'; if (['3', '3e', '3eme'].includes(normalized)) return '3e'; if (['2nde', '2nd', 'seconde'].includes(normalized)) return '2nde'; if (['1ere', '1re'].includes(normalized)) return '1ere'; if (['tle', 'terminale', 'term'].includes(normalized)) return 'terminale'; return ''; };
 
-function useSecretaryClassSearch(classes, search, enabled = true) {
-  const [results, setResults] = useState(classes);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
+function useSecretaryClassSearch(classes, search) {
+  const results = useMemo(() => {
     const term = search.trim();
-    let active = true;
-    if (!enabled || !term) {
-      setResults(classes);
-      setLoading(false);
-      setError('');
-      return () => { active = false; };
-    }
+    if (!term) return classes;
+    return sortClasses(classes.filter((item) => matchClassSearch(item, term)));
+  }, [classes, search]);
 
-    setLoading(true);
-    setError('');
-    const timer = setTimeout(() => {
-      secretariatAPI.listClasses(term)
-        .then(({ data }) => {
-          if (!active) return;
-          const serverClasses = Array.isArray(data.classes) ? data.classes : [];
-          const serverClassIds = new Set(serverClasses.map((item) => item.id));
-          const localMatches = classes.filter((item) =>
-            matchClassSearch(item, term) && !serverClassIds.has(item.id)
-          );
-          setResults(sortClasses([...serverClasses, ...localMatches]));
-        })
-        .catch(() => {
-          if (!active) return;
-          setResults([]);
-          setError('Impossible de rechercher les classes. Réessayez.');
-        })
-        .finally(() => { if (active) setLoading(false); });
-    }, 250);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [classes, search, enabled]);
-
-  return { classes: results, loading, error };
+  return { classes: results, loading: false, error: '' };
 }
 
 export default function ManagementDashboard({ onLogout }) {
