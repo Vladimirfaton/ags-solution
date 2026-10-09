@@ -77,15 +77,85 @@ export function HistoryPanel() {
     </section>
   );
 }
+function OverdueClassGroup({ group, search }) {
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState({ items: [], total: group.count });
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const pageSize = 5;
+  const totalPages = Math.max(1, Math.ceil(data.total / pageSize));
+
+  useEffect(() => { setPage(1); }, [search, group.count]);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    comptabiliteAPI.overdueInstallmentsByClass(group.classe, search, page, pageSize)
+      .then(({ data }) => { if (active) setData(data); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [group.classe, group.count, search, page]);
+
+  const download = async () => {
+    setDownloading(true);
+    try {
+      const response = await comptabiliteAPI.exportOverdueInstallments(group.classe);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `echeances-depassees-${group.classe}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-slate-800">{group.classe} <span className="font-normal text-slate-400">· {group.count} tranche(s) en retard</span></h3>
+        <button type="button" onClick={download} disabled={downloading} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
+          <Download className="h-3.5 w-3.5" />{downloading ? 'Téléchargement…' : 'Télécharger'}
+        </button>
+      </div>
+      <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+        {loading ? Array.from({ length: Math.min(group.count, pageSize) }).map((_, i) => <div key={i} className="h-14 animate-pulse bg-slate-50" />) : data.items.map((item) => (
+          <div key={item.obligationId} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+            <div className="min-w-0">
+              <p className="truncate font-medium text-slate-800">{item.nom} {item.prenom} <span className="font-normal text-slate-400">· {item.matricule}</span></p>
+              <p className="mt-0.5 text-xs text-slate-500">{item.libelle} · échue le {new Date(item.dateEcheance).toLocaleDateString('fr-FR')}</p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="font-semibold text-rose-700">{money(item.reste)}</p>
+              <p className="text-xs text-slate-500">{item.statut === 'partiel' ? `Payé ${money(item.montantPaye)} / ${money(item.montantDu)}` : 'Rien payé'}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      {totalPages > 1 && (
+        <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+          <span>Page {page} sur {totalPages}</span>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1 || loading} className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 disabled:opacity-40">Précédent</button>
+            <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages || loading} className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 disabled:opacity-40">Suivant</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 export function OverdueInstallmentsPanel() {
   const [search, setSearch] = useState('');
-  const [data, setData] = useState({ classes: [], count: 0, totalReste: 0 });
+  const [data, setData] = useState({ classes: [], count: 0, totalReste: 0, appliedSearch: '' });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(true);
-      comptabiliteAPI.overdueInstallments(search).then(({ data }) => setData(data)).finally(() => setLoading(false));
+      comptabiliteAPI.overdueInstallments(search).then(({ data }) => setData({ ...data, appliedSearch: search })).finally(() => setLoading(false));
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
@@ -118,25 +188,7 @@ export function OverdueInstallmentsPanel() {
           <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100" />)}</div>
         ) : data.classes.length ? (
           <div className="space-y-6">
-            {data.classes.map((group) => (
-              <div key={group.classe}>
-                <h3 className="mb-2 text-sm font-semibold text-slate-800">{group.classe}</h3>
-                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
-                  {group.items.map((item) => (
-                    <div key={item.obligationId} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-800">{item.nom} {item.prenom} <span className="font-normal text-slate-400">· {item.matricule}</span></p>
-                        <p className="mt-0.5 text-xs text-slate-500">{item.libelle} · échue le {new Date(item.dateEcheance).toLocaleDateString('fr-FR')}</p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="font-semibold text-rose-700">{money(item.reste)}</p>
-                        <p className="text-xs text-slate-500">{item.statut === 'partiel' ? `Payé ${money(item.montantPaye)} / ${money(item.montantDu)}` : 'Rien payé'}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+            {data.classes.map((group) => <OverdueClassGroup key={group.classe} group={group} search={data.appliedSearch} />)}
           </div>
         ) : <p className="rounded-xl border border-dashed border-slate-200 p-5 text-sm text-slate-500">Aucune échéance dépassée.</p>}
       </section>

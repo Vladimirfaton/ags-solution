@@ -1,6 +1,11 @@
 import logger from '../config/logger.js';
+import { isDatabaseUnavailable, sendDatabaseUnavailable } from '../utils/databaseErrors.js';
 
 export const errorHandler = (err, req, res, next) => {
+    if (isDatabaseUnavailable(err)) {
+    logger.error(`Base de données indisponible: ${err.message}`);
+    return sendDatabaseUnavailable(res);
+  }
   logger.error(`${req.method} ${req.originalUrl} — ${err.message}`);
   if (err.stack) logger.debug(err.stack);
 

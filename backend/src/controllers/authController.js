@@ -8,6 +8,7 @@ import { generateOTP, saveOTP, verifyOTP } from '../utils/otpUtils.js';
 import { sendOtpEmail, sendSimpleEmail } from '../utils/email.js';
 import { isValidPassword } from '../utils/validators.js';
 import { PLATFORM_NAME } from '../config/branding.js';
+import { isDatabaseUnavailable, sendDatabaseUnavailable } from '../utils/databaseErrors.js';
 
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const SESSION_SECONDS = 7 * 24 * 60 * 60;
@@ -59,7 +60,11 @@ export const loginGestion = async (req, res) => {
     if (!user || !User.isManagementRole(user.role) || !(await User.verifyPassword(password, user.password_hash))) return res.status(401).json({ error: 'Identifiants invalides' });
     if (user.status !== 'active' || user.disabled_at) return res.status(403).json({ error: 'Compte désactivé', code: 'ACCOUNT_DISABLED' });
     return res.json(await issueSession(user, req));
-  } catch (error) { logger.error(`Connexion gestion: ${error.message}`); return res.status(500).json({ error: 'Erreur lors de la connexion' }); }
+  } catch (error) {
+    logger.error(`Connexion gestion: ${error.message}`);
+    if (isDatabaseUnavailable(error)) return sendDatabaseUnavailable(res);
+    return res.status(500).json({ error: 'Erreur lors de la connexion' });
+  }
 };
 export const getMyProfile = async (req, res) => res.json({ user: publicUser(req.user) });
 export const updateMyProfile = async (req, res) => {

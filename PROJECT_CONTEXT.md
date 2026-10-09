@@ -1,6 +1,6 @@
 # Contexte durable du projet — FVS / AGS-Solution
 
-> Dernière mise à jour : 25 septembre 2026
+> Dernière mise à jour : 9 octobre 2026
 > Document de continuité pour toute nouvelle session de développement.
 > Ce document décrit les décisions fonctionnelles validées, la cible architecturale et les travaux prévus. Pour connaître l'état exact d'une fonctionnalité, lire le code réel et vérifier les migrations appliquées.
 
@@ -379,24 +379,25 @@ Le chantier de transition vers `Establishment` / `AcademicStructure` n'est pas e
 - certaines requêtes ou interfaces peuvent encore attendre l'ancien modèle ;
 - le collège doit être entièrement validé avec `niveau_id` ;
 - le primaire `CI` à `CM2` reste à brancher ;
-- la recherche `CI` dans l'espace secrétaire reste non résolue : l'utilisateur rapporte qu'une recherche `CI` ne retourne toujours aucun résultat sans préciser le groupe (par exemple `CI-A`). Des tentatives de recherche côté serveur et de fusion avec les résultats locaux ont été faites, mais le comportement n'est pas validé et le problème persiste. À reprendre ultérieurement en vérifiant le parcours réel de la requête et les données affichées dans « Capacité des classes » et « Classes et élèves » ;
+- le problème de recherche `CI` dans l'espace secrétaire est résolu. La comparaison s'effectuait sur le nom complet de la classe, qui assemble notamment le site principal (« Cité ministérielle »), la classe et le niveau ; la recherche courte `CI` correspondait alors à tort à du texte dans ce nom composé. La recherche actuelle filtre la liste chargée côté interface, normalise accents et casse, et tient compte des codes/noms de niveaux et de certaines recherches par site ;
 - l'ancien modèle `College` / `Class` doit être supprimé seulement après validation ;
-- l'activation Cartes doit être reliée au système de services, pas à l'ancien modèle ;
+- le service Cartes est relié au mécanisme d'autorisation et de sélection des sites, mais le branchement fonctionnel complet de sa section reste à finaliser ;
 - le flux obsolète d'activation de comptes par email sur ancien modèle ne doit pas être poursuivi.
 
 ## 14. Ordre de développement recommandé
 
-1. Vérifier l'état réel des migrations et corriger les incohérences.
-2. Inventorier toutes les références à l'ancien modèle et à `niveau_code`.
-3. Corriger les requêtes et flux collège vers `niveau_id`, avec `code` disponible en complément.
-4. Valider les quatre espaces de gestion : directeur, secrétaire, comptable, censeur.
-5. Valider création de sites/filiales et isolation par site.
-6. Valider inscriptions, réinscriptions, classes, transferts, finances et import.
-7. Mettre en place le service Cartes activable sans dépendance à l'ancien modèle.
-8. Brancher le primaire `CI` à `CM2` sur la même architecture.
-9. Valider groupes/séries et règles d'affichage collège/primaire.
-10. Supprimer l'ancien modèle `College` / `Class` après recherche complète des références.
-11. Préparer le chantier notes, bulletins et classements.
+1. Finaliser le branchement de la section Cartes pour la direction et le secrétariat, puis l'espace admin de génération ; suivre les détails de la section 17.6.
+2. Vérifier les changements récents des espaces Comptable et Secrétaire, notamment l'affichage des échéances dépassées. Le problème de recherche `CI` est résolu ; éviter de réintroduire une comparaison de la requête courte avec le nom composé complet de la classe.
+3. Vérifier l'état réel des migrations et corriger les incohérences.
+4. Inventorier toutes les références à l'ancien modèle et à `niveau_code`.
+5. Corriger les requêtes et flux collège vers `niveau_id`, avec `code` disponible en complément.
+6. Valider les quatre espaces de gestion : directeur, secrétaire, comptable, censeur.
+7. Valider création de sites/filiales et isolation par site.
+8. Valider inscriptions, réinscriptions, classes, transferts, finances et import.
+9. Brancher le primaire `CI` à `CM2` sur la même architecture.
+10. Valider groupes/séries et règles d'affichage collège/primaire.
+11. Supprimer l'ancien modèle `College` / `Class` après recherche complète des références.
+12. Préparer le chantier notes, bulletins et classements.
 
 ## 15. Fichiers et zones de référence
 
@@ -423,7 +424,7 @@ Frontend : React 18, Vite, Tailwind, Axios, React Router, lucide-react, pdf-lib.
 
 Hébergement : frontend Vercel, backend Render plan gratuit, base Supabase.
 
-## 17. État réel mis à jour au 29 septembre 2026
+## 17. État réel mis à jour au 9 octobre 2026
 
 Cette section fait foi pour la reprise du projet. Elle complète les décisions précédentes sans les remplacer.
 
@@ -442,11 +443,11 @@ Implémenté ou présent dans le dépôt :
 
 Les anciens modèles `College`, `Class`, `college_id` et les fichiers du dossier `ref/` sont historiques. Ils ne doivent pas être utilisés pour ajouter une nouvelle fonctionnalité.
 
-### 17.2 Service Cartes d'identité scolaire : fonctionnement validé
+### 17.2 Service Cartes d'identité scolaire : mécanisme en place, parcours à finaliser
 
-Le service Cartes est distinct de la gestion scolaire.
+Le service Cartes est distinct de la gestion scolaire. L'autorisation admin, la confirmation des sites et l'aperçu classes/élèves modernes existent côté backend ; le parcours complet de préparation et de génération n'est pas encore branché.
 
-Le flux cible et maintenant implémenté côté backend est :
+Le parcours cible est :
 
 ```text
 Administrateur FVS
@@ -454,9 +455,8 @@ Administrateur FVS
       → Directeur confirme son adhésion
           → sélectionne un ou plusieurs sites
               → Directeur + Secrétaire voient Cartes d'identité scolaire
-                  → préparation par site
-Administrateur FVS
-  → génération finale réservée à l'espace admin
+                  → préparent élèves, brouillons et observations par site
+                      → Administrateur FVS génère les cartes finales
 ```
 
 Règles :
@@ -466,16 +466,16 @@ Règles :
 - plusieurs sites imposent la sélection des sites par le directeur ;
 - la sélection est enregistrée dans `services_cartes_sites` ;
 - le nom du site reste présent dans les listes/classes afin de ne pas mélanger les données ;
-- le directeur et la secrétaire ont les mêmes droits Cartes de préparation et de consultation ;
+- le directeur et la secrétaire doivent avoir les droits Cartes de préparation et de consultation prévus ;
 - la génération finale ne doit jamais être exposée aux comptes de gestion ;
-- les permissions Cartes ne donnent pas accès à un autre site ;
+- chaque requête Cartes doit appliquer à la fois la portée utilisateur et les sites confirmés ; ce contrôle reste à vérifier et à terminer ;
 - le libellé utilisateur est « Cartes d'identité scolaire », pas « FVS Cartes ».
 
 Migration ajoutée et appliquée :
 
 - `1791000000000_activation-cartes-par-sites.js` ajoute `modules_plateforme.admin_actif` et la table `services_cartes_sites`.
 
-Le modèle `CardService` expose désormais l'autorisation admin, les sites autorisés et les classes modernes. Les routes Cartes utilisent exclusivement les tables modernes et `AccessScope`.
+Le modèle `CardService` expose l'autorisation admin, les sites confirmés, les statistiques et l'aperçu de classes modernes. Les routes Cartes utilisent les tables modernes et `AccessScope`. Ces éléments ne valident pas à eux seuls le filtrage sur les sites confirmés ni le parcours complet de préparation/génération.
 
 ### 17.3 Stockage des photos et signatures
 
@@ -508,32 +508,37 @@ Présent :
 - `DirectorCockpit.jsx` affiche le consentement et la sélection des sites ;
 - `DirectorWorkspace.jsx` affiche la section Cartes seulement après activation ;
 - `ManagementWorkspace.jsx` affiche la section Cartes à la secrétaire après activation de son site ;
-- `CardServicePanel.jsx` charge les classes et les élèves via les routes modernes ;
+- `CardServicePanel.jsx` sait charger un aperçu de classe et de ses élèves via les routes modernes ;
 - la génération PDF est masquée pour la direction et la secrétaire.
+
+Le branchement d'interface reste partiel : `RoleContent` monte actuellement `CardServicePanel` avec la liste des classes seulement. Le panneau ne reçoit donc pas encore tout le contexte d'activation, de site et de droits nécessaire au parcours complet. La présence de l'entrée de menu et de l'aperçu ne signifie pas que les brouillons, observations, notifications et la génération admin sont intégrés.
 
 Le dossier `ref/` reste uniquement une source de comportement et de mise en page. Il ne doit pas être importé directement dans l'application.
 
 ### 17.6 Travaux encore restants
 
-Priorité immédiate :
+**Prochaine phase : finaliser le branchement de la section Cartes.** Procéder par étapes et vérifier chaque parcours sur les routes et données modernes :
 
-1. Finaliser le nouvel espace de préparation Cartes directeur/secrétaire à partir du comportement de `ref/DashboardGestion.jsx` :
+1. Brancher complètement la section directeur/secrétaire à l'état du service, aux sites confirmés et aux classes accessibles ; conserver la séparation des droits et ne pas exposer la génération finale aux comptes de gestion.
+2. Finaliser l'espace de préparation directeur/secrétaire à partir du comportement de `ref/DashboardGestion.jsx` :
    - onglet Élèves ;
    - onglet Brouillon ;
    - onglet Observations ;
    - notifications et état « brouillon prêt » ;
    - actions limitées au site autorisé.
-2. Finaliser le dashboard admin de génération à partir du comportement de `ref/Dashboard.jsx` :
+3. Finaliser le dashboard admin de génération à partir du comportement de `ref/Dashboard.jsx` :
    - navigation par site ;
    - classes et élèves modernes ;
    - aperçu brouillon ;
    - génération finale A4/PVC avec données de l'établissement ;
    - aucune référence à `College`, `Class` ou `college_id`.
-3. Ajouter les contrôleurs modernes pour les brouillons, observations et notifications si les contrôleurs actuels ne couvrent pas encore les tables modernes `cartes_brouillons` et `cartes_notifications`.
-4. Filtrer toutes les requêtes Cartes par `services_cartes_sites` en plus de la portée utilisateur, afin qu'un directeur ne génère ou ne consulte jamais un site non confirmé.
-5. Vérifier le bucket `ads-uploads`, les politiques Storage Supabase et les URLs publiques/signées en environnement réel.
-6. Corriger ou confirmer le build frontend, actuellement bloqué localement par `Cannot read directory "../..": Access is denied` dans esbuild Windows.
-7. Après branchement des interfaces, effectuer un test manuel multi-site : site A/site B, directeur et secrétaire, photos Storage, brouillon, observation et génération admin.
+4. Ajouter les opérations modernes de lecture/écriture des brouillons, observations et notifications : les routes/modèles actuellement repérés couvrent l'état du service, la confirmation des sites, les statistiques et l'aperçu élèves/classe, mais pas encore ce flux complet.
+5. Vérifier que toutes les requêtes Cartes appliquent à la fois la portée utilisateur et la sélection enregistrée dans `services_cartes_sites`, afin qu'aucun site non confirmé ne soit consultable ou générable.
+6. Vérifier le bucket `ads-uploads`, les politiques Storage Supabase et les URLs publiques/signées en environnement réel.
+7. Corriger ou confirmer le build frontend, précédemment bloqué localement par `Cannot read directory "../..": Access is denied` dans esbuild Windows.
+8. Effectuer un test manuel multi-site : site A/site B, directeur et secrétaire, isolation des données, photos Storage, brouillon, observation, notifications et génération finale admin A4/PVC.
+
+Ne pas reprendre la génération finale comme une action de la direction ou du secrétariat. Ne pas réutiliser les anciens écrans comme dépendances de production et ne pas considérer la section Cartes comme finalisée sur la seule base de son entrée de menu.
 
 ### 17.7 Vision future — préparation parallèle des années scolaires et archives
 
@@ -572,3 +577,27 @@ npm.cmd test
 ```
 
 Ne jamais appliquer une migration destructive sans vérifier la cible, le backup et le contenu réel de la base. La migration `1790339258594_remodelage-db.js` reste particulièrement sensible car elle contient une reconstruction destructive avec `TRUNCATE ... CASCADE`.
+
+### 17.9 Évolutions récentes — secrétariat et comptabilité
+
+**Secrétariat — recherche des classes :**
+
+- la recherche côté interface s'appuie désormais sur la liste de classes déjà chargée plutôt que d'envoyer une requête serveur à chaque saisie ;
+- les accents et la casse sont normalisés ; les codes de niveaux, libellés, divisions et certaines recherches par nom de site sont pris en compte ;
+- le backend a également ajusté sa recherche de classes/site ;
+- le bug de recherche `CI` est résolu : la comparaison utilisait le nom complet composé de la classe (site principal, notamment « Cité ministérielle », classe et niveau). La chaîne recherchée `CI` se retrouvait ainsi dans le texte d'un champ composé et produisait une correspondance erronée. Ne pas réintroduire cette comparaison globale sur le libellé complet ; rechercher sur les champs pertinents (code/niveau, division ou site selon le terme) afin d'éviter les faux positifs.
+
+**Comptabilité — échéances dépassées :**
+
+- la synthèse présente les retards par classe, puis charge les échéances de la classe par pages (cinq éléments par défaut, limite serveur de cinquante) ;
+- une recherche peut être appliquée aux résultats paginés et une classe peut être exportée en fichier Excel ;
+- les nouveaux endpoints d'affichage et d'export sont protégés par la permission `caisse.gerer` et utilisent la portée de site du compte ;
+- le changement est visible dans `OverdueInstallments`, `comptabiliteController`, `comptabiliteRoutes` et `FinanceOverview`.
+
+**Disponibilité des services :**
+
+- le pool PostgreSQL a été réduit et ses délais d'inactivité/keep-alive ajustés ;
+- les erreurs transitoires ne déclenchent des tentatives supplémentaires que pour les requêtes identifiées comme lectures (`SELECT`/`WITH`), pas pour les écritures ;
+- les erreurs d'indisponibilité de la base sont centralisées et renvoient HTTP 503 avec `Retry-After` ; le client attend désormais jusqu'à 30 secondes et affiche un message temporaire pour les erreurs réseau/503.
+
+Ces évolutions sont observées dans le code actuel mais ne sont pas déclarées validées par une nouvelle campagne de tests dans cette mise à jour du contexte. Vérifier les parcours secrétaire/comptable et les tests ciblés avant de considérer les changements comme stabilisés.

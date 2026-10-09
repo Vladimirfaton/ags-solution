@@ -4,7 +4,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 export const FILE_BASE_URL = API_URL.replace(/\/api\/?$/, '');
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 15000,
+  timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -17,15 +17,19 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const UNAVAILABLE_MESSAGE = 'Service momentanément indisponible. Réessayez dans quelques instants.';
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
 
-    // Les détails d'une erreur 500 restent exclusivement dans les journaux du
-    // serveur. L'interface ne reçoit qu'un message compréhensible et sûr.
-    if (status >= 500 && error.response?.data) {
+    if (status === 503) {
+      if (error.response.data) error.response.data.error = UNAVAILABLE_MESSAGE;
+    } else if (status >= 500 && error.response?.data) {
       error.response.data.error = 'Une erreur technique est survenue. Réessayez ou contactez l’assistance.';
+    } else if (!error.response && error.code !== 'ERR_CANCELED') {
+      error.response = { status: 0, data: { error: UNAVAILABLE_MESSAGE } };
     }
 
     if (status === 401) {
@@ -124,6 +128,8 @@ export const comptabiliteAPI = {
   paymentHistory: (search = '', page = 1) => api.get('/comptabilite/paiements/historique', { params: { recherche: search, page, pageSize: 10 } }),
   getPaymentReceipt: (id) => api.get(`/comptabilite/paiements/${id}/recu`),
   overdueInstallments: (search = '') => api.get('/comptabilite/paiements/echeances-depassees', { params: { recherche: search } }),
+  exportOverdueInstallments: (classe) => api.get('/comptabilite/paiements/echeances-depassees/export', { params: { classe }, responseType: 'blob' }),
+    overdueInstallmentsByClass: (classe, search = '', page = 1, pageSize = 5) => api.get('/comptabilite/paiements/echeances-depassees/classe', { params: { classe, recherche: search, page, pageSize } }),
   classesForStudent: (studentId) => api.get(`/comptabilite/inscriptions/eleve/${studentId}/classes`),
 };
 

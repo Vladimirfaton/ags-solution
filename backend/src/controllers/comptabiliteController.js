@@ -96,6 +96,60 @@ export const getPaymentReceipt = async (req, res, next) => {
   try { res.json(await Payment.getReceiptData(req.params.id, await accessScopeFor(req.user))); } catch (error) { next(error); }
 };
 export const getOverdueInstallments = async (req, res, next) => {
-  try { res.json(await OverdueInstallments.list(await accessScopeFor(req.user), { search: req.query.recherche || '' })); }
+  try { res.json(await OverdueInstallments.summary(await accessScopeFor(req.user), { search: req.query.recherche || '' })); }
   catch (error) { next(error); }
+};
+export const getOverdueInstallmentsByClass = async (req, res, next) => {
+  try {
+    const classe = String(req.query.classe || '').trim();
+    if (!classe) return res.status(400).json({ error: 'La classe est requise.' });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 5));
+    res.json(await OverdueInstallments.pageForClass(await accessScopeFor(req.user), { classe, search: req.query.recherche || '', page, pageSize }));
+  } catch (error) { next(error); }
+};
+export const exportOverdueInstallments = async (req, res, next) => {
+  try {
+    const classe = String(req.query.classe || '').trim();
+    if (!classe) return res.status(400).json({ error: 'La classe est requise.' });
+    const items = await OverdueInstallments.allForClass(await accessScopeFor(req.user), { classe });
+    if (!items.length) return res.status(404).json({ error: 'Aucune échéance dépassée pour cette classe.' });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Échéances dépassées');
+    sheet.columns = [
+      { header: 'Matricule', key: 'matricule', width: 18 },
+      { header: 'Nom', key: 'nom', width: 24 },
+      { header: 'Prénom', key: 'prenom', width: 24 },
+      { header: 'Tranche', key: 'libelle', width: 24 },
+      { header: 'Échéance', key: 'dateEcheance', width: 14 },
+      { header: 'Montant dû', key: 'montantDu', width: 16 },
+      { header: 'Montant payé', key: 'montantPaye', width: 16 },
+      { header: 'Reste', key: 'reste', width: 16 },
+      { header: 'Statut', key: 'statut', width: 12 },
+    ];
+    for (const item of items) {
+      sheet.addRow({
+        matricule: item.matricule,
+        nom: item.nom,
+        prenom: item.prenom,
+        libelle: item.libelle,
+        dateEcheance: new Date(item.dateEcheance).toLocaleDateString('fr-FR'),
+        montantDu: Number(item.montantDu || 0),
+        montantPaye: Number(item.montantPaye || 0),
+        reste: Number(item.reste || 0),
+        statut: item.statut === 'partiel' ? 'Partiel' : 'Impayé',
+      });
+    }
+    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE11D48' } };
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+    ['F', 'G', 'H'].forEach((column) => { sheet.getColumn(column).numFmt = '#,##0'; });
+
+    const fileName = `echeances-depassees-${classe.replace(/[^a-zA-Z0-9-]/g, '_')}.xlsx`;
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(buffer);
+  } catch (error) { next(error); }
 };

@@ -21,11 +21,11 @@ const useSsl = process.env.NODE_ENV === 'production' || /supabase\.(com|co)/.tes
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: useSsl ? { rejectUnauthorized: false } : false,
-  max: 10,
-  idleTimeoutMillis: 30000,
+  max: 5,
+  idleTimeoutMillis: 8000,
   connectionTimeoutMillis: 20000,
   keepAlive: true,
-  keepAliveInitialDelayMillis: 10000,
+  keepAliveInitialDelayMillis: 5000,
 });
 
 pool.on('error', (err) => {
@@ -36,8 +36,25 @@ pool.query('SELECT 1').catch((err) => {
   console.error('Préchauffage du pool échoué:', { code: err.code, message: err.message });
 });
 
-export const query = (text, params) => {
-  return pool.query(text, params);
+const transientCodes = ['ECONNRESET', 'ETIMEDOUT', 'EPIPE'];
+const isTransient = (error) =>
+  transientCodes.includes(error?.code) ||
+  /Connection terminated|timeout exceeded when trying to connect/i.test(error?.message || '');
+const isReadOnly = (text) => /^\s*(select|with)\b/i.test(text) && !/\b(insert|update|delete)\b/i.test(text);
+
+export const query = async (text, params) => {
+  const attempts = isReadOnly(text) ? 3 : 1;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await pool.query(text, params);
+    } catch (error) {
+      lastError = error;
+      if (!isTransient(error) || attempt === attempts) break;
+      await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+    }
+  }
+  throw lastError;
 };
 
 export default { supabase, pool, query };

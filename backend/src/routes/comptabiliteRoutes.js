@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { createEnrollment, createPayment, downloadStudentImportTemplate, exportPaymentStatus, getCashOverview, getClassesForStudent, getEnrollmentOptions, getOverdueInstallments, getPaymentHistory, getPaymentReceipt, getPaymentOptions, getPaymentStatus } from '../controllers/comptabiliteController.js';
+import { createEnrollment, createPayment, downloadStudentImportTemplate, exportOverdueInstallments, exportPaymentStatus, getCashOverview, getClassesForStudent, getEnrollmentOptions, getOverdueInstallments, getOverdueInstallmentsByClass, getPaymentHistory, getPaymentReceipt, getPaymentOptions, getPaymentStatus } from '../controllers/comptabiliteController.js';
 import { getFinancialConfiguration, saveFinancialConfiguration } from '../controllers/directionController.js';
 import { confirmStudentImport, previewStudentImport } from '../controllers/studentImportController.js';
 import { authenticate, authorizePermission } from '../middleware/auth.js';
@@ -35,4 +35,6 @@ router.get('/paiements/statut/export', authorizePermission('caisse.gerer'), expo
 router.get('/paiements/historique', authorizePermission('caisse.gerer'), getPaymentHistory);
 router.get('/paiements/:id/recu', authorizePermission('caisse.gerer'), getPaymentReceipt);
 router.get('/paiements/echeances-depassees', authorizePermission('caisse.gerer'), getOverdueInstallments);
+router.get('/paiements/echeances-depassees/export', authorizePermission('caisse.gerer'), exportOverdueInstallments);
+router.get('/paiements/echeances-depassees/classe', authorizePermission('caisse.gerer'), getOverdueInstallmentsByClass);
 export default router;
