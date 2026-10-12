@@ -112,11 +112,12 @@ export default function DirectorCockpit({ direction, schoolYears = [], yearForm,
         <IdCard className="h-4 w-4" />
       </span>
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">FVS Cartes</p>
-        <h3 className="mt-2 font-semibold text-slate-900">{cardService?.actif ? 'Service activé' : 'Service non activé'}</h3>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Cartes d’identité scolaire</p>
+        <h3 className="mt-2 font-semibold text-slate-900">{cardService?.actif ? 'Service activé' : cardService?.admin_actif ? 'Prêt à activer' : 'Service non autorisé'}</h3>
         <p className="mt-2 text-xs leading-5 text-slate-500">
-          Les classes et effectifs existants seront transmis au service sans double saisie. {cardService?.actif ? 'La section Cartes est disponible dans la barre latérale.' : 'Activez-la pour ouvrir le module de génération des cartes.'}
+          Les classes et effectifs existants sont utilisés sans double saisie. {cardService?.actif ? 'La section Cartes d’identité scolaire est disponible dans la barre latérale.' : cardService?.admin_actif ? (cardService?.sites?.length > 1 ? 'Sélectionnez les sites concernés, puis activez la section.' : 'Activez la section pour ouvrir la préparation des cartes.') : 'En attente de l’autorisation de l’administrateur FVS.'}
         </p>
+        {cardService?.actif && <p className="mt-3 text-xs font-medium text-emerald-700">Sites actifs : {cardService.sites.filter((site) => site.confirme_at).map((site) => site.nom).join(', ')}</p>}
         {!cardService?.actif && cardService?.admin_actif && cardService?.sites?.length > 1 && <div className="mt-4 space-y-2">{cardService.sites.map((site) => <label key={site.id} className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={selectedCardSites.includes(site.id)} onChange={(event) => setSelectedCardSites((current) => event.target.checked ? [...current, site.id] : current.filter((id) => id !== site.id))} />{site.nom}</label>)}</div>}
         {!cardService?.actif && cardService?.admin_actif && <button type="button" onClick={() => toggleCards(selectedCardSites)} disabled={cardService?.sites?.length > 1 && !selectedCardSites.length} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Activer la section Cartes</button>}
         {!cardService?.actif && !cardService?.admin_actif && <p className="mt-4 text-xs font-medium text-amber-700">L’administrateur doit d’abord autoriser ce service.</p>}

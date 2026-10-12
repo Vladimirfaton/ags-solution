@@ -150,12 +150,32 @@ export const censeurAPI = {
 
 export const cartesAPI = {
   status: () => api.get('/cartes/statut'),
-  setStatus: (actif) => api.put('/cartes/statut', { actif }),
   setAdminStatus: (actif) => api.put('/cartes/autorisation-admin', { actif }),
   confirmSites: (siteIds) => api.put('/cartes/sites', { siteIds }),
   adminClasses: () => api.get('/cartes/admin/classes'),
+  adminPreview: (classId) => api.get(`/cartes/admin/classes/${classId}/preview`),
   stats: () => api.get('/cartes/stats'),
   preview: (classId) => api.get(`/cartes/classes/${classId}/preview`),
+  listObservations: (classId) => api.get(`/cartes/classes/${classId}/observations`),
+  createObservation: (classId, contenu, eleveId = null) => api.post(`/cartes/classes/${classId}/observations`, { contenu, eleveId }),
+  deleteObservation: (observationId) => api.delete(`/cartes/observations/${observationId}`),
+  unreadObservations: () => api.get('/cartes/admin/observations/non-lues'),
+  markObservationsRead: () => api.put('/cartes/admin/observations/marquer-lues'),
+  listNotifications: (siteId = null) => api.get('/cartes/admin/notifications', { params: siteId ? { siteId } : {} }),
+  sendNotification: (data) => api.post('/cartes/admin/notifications', data),
+    getIdentity: () => api.get('/cartes/admin/identite'),
+  updateIdentity: (slogan) => api.put('/cartes/admin/identite', { slogan }),
+  uploadSignature: (file) => {
+    const formData = new FormData();
+    formData.append('signature', file);
+    return api.post('/cartes/admin/signature', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+    updateStudent: (studentId, data) => api.put(`/cartes/admin/eleves/${studentId}`, data),
+  uploadStudentPhoto: (studentId, file) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    return api.post(`/cartes/admin/eleves/${studentId}/photo`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
 export const assistanceAPI = {

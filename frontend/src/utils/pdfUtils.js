@@ -70,8 +70,8 @@ const embedLogo = (pdfDoc) => embedFromUrl(pdfDoc, '/logo.png');
 // VITE_API_URL doit pointer vers l'IP reseau du PC (pas "localhost") pour etre
 // joignable depuis un telephone.
 export const buildQrPayload = (collegeInfo) => {
-  if (!collegeInfo?.id) return `${FILE_BASE_URL}/api/colleges`;
-  return `${FILE_BASE_URL}/api/colleges/${collegeInfo.id}/carte-info`;
+  if (!collegeInfo?.id) return `${FILE_BASE_URL}/api/cartes`;
+  return `${FILE_BASE_URL}/api/cartes/carte-info/${collegeInfo.id}`;
 };
 
 const embedQr = async (pdfDoc, text) => {

@@ -27,3 +27,6 @@ export const getCardServiceStats = async (req, res, next) => {
 export const listCardClassesForAdmin = async (_req, res, next) => {
   try { await CardService.assertAdminEnabled(); res.json({ classes: await CardService.listClassesForAdmin() }); } catch (error) { next(error); }
 };
+export const previewCardsForAdmin = async (req, res, next) => {
+  try { res.json(await CardService.preview(req.params.classId, null)); } catch (error) { next(error); }
+};
