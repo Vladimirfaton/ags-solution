@@ -25,7 +25,7 @@ export class CardService {
 
   static async setAdminEnabled(enabled) { return this.setEnabled(enabled); }
 
-  static async confirmSites(siteIds, userId) {
+  static async confirmSites(siteIds, userId, scope = null) {
     const ids = [...new Set((siteIds || []).filter(Boolean))];
     const sites = await query("SELECT id FROM sites WHERE actif = true AND nom NOT LIKE 'TEST-INT-%' ORDER BY est_principal DESC, nom");
     if (!sites.rowCount) throw Object.assign(new Error('Aucun site configuré.'), { status: 400, expose: true });
@@ -33,10 +33,28 @@ export class CardService {
     if (!selected.length) throw Object.assign(new Error('Sélectionnez au moins un site.'), { status: 400, expose: true });
     const allowed = new Set(sites.rows.map((site) => site.id));
     if (selected.some((id) => !allowed.has(id))) throw Object.assign(new Error('Un site sélectionné est invalide.'), { status: 400, expose: true });
+    if (scope && !scope.allSites && selected.some((id) => !scope.siteIds.includes(id))) {
+      throw Object.assign(new Error('Un site sélectionné n’est pas autorisé.'), { status: 403, expose: true });
+    }
     await this.assertAdminEnabled();
-    await query('DELETE FROM services_cartes_sites');
-    for (const siteId of selected) await query('INSERT INTO services_cartes_sites (site_id, confirme_par) VALUES ($1, $2)', [siteId, userId]);
-    return this.status();
+    for (const siteId of selected) {
+      await query('INSERT INTO services_cartes_sites (site_id, confirme_par) VALUES ($1, $2) ON CONFLICT (site_id) DO NOTHING', [siteId, userId]);
+    }
+    return this.status(scope);
+  }
+
+  static async activateSite(siteId, userId, scope) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteId || '')) {
+      throw Object.assign(new Error('Identifiant de site invalide.'), { status: 400, expose: true });
+    }
+    await this.assertAdminEnabled();
+    if (scope && !scope.allSites && !scope.siteIds.includes(siteId)) {
+      throw Object.assign(new Error('Site non autorisé.'), { status: 403, expose: true });
+    }
+    const site = await query("SELECT id FROM sites WHERE id = $1 AND actif = true AND nom NOT LIKE 'TEST-INT-%'", [siteId]);
+    if (!site.rowCount) throw Object.assign(new Error('Site introuvable ou inactif.'), { status: 404, expose: true });
+    await query('INSERT INTO services_cartes_sites (site_id, confirme_par) VALUES ($1, $2) ON CONFLICT (site_id) DO NOTHING', [siteId, userId]);
+    return this.status(scope);
   }
 
   static async assertAdminEnabled() {
@@ -55,6 +73,39 @@ export class CardService {
       ? confirmedIds.filter((id) => scope.siteIds.includes(id))
       : confirmedIds;
     return { allSites: false, siteIds };
+  }
+
+  static async listManagementClasses(scope) {
+    await this.assertEnabled();
+    const siteFilter = scopedWhere(await this.effectiveScope(scope), 'ca.site_id', 1);
+    const result = await query(`SELECT ca.id, ca.code_affichage, ca.site_id, s.nom AS site_nom, a.libelle AS annee_libelle
+      FROM classes_annuelles ca
+      JOIN annees_scolaires a ON a.id = ca.annee_scolaire_id AND a.statut = 'active'
+      JOIN sites s ON s.id = ca.site_id
+      JOIN services_cartes_sites scs ON scs.site_id = ca.site_id
+      WHERE ca.actif = true${siteFilter.sql}
+      ORDER BY s.nom, ca.code_affichage`, siteFilter.params);
+    return result.rows;
+  }
+
+  static async recordDraft(classId) {
+    await this.assertEnabled();
+    const classInfo = await this.classContext(classId, null);
+    if (!classInfo) throw Object.assign(new Error('Classe annuelle introuvable ou non autorisée.'), { status: 404, expose: true });
+    const students = await query(`SELECT COUNT(DISTINCT i.eleve_id)::int AS total
+      FROM affectations_inscription ai
+      JOIN inscriptions i ON i.id = ai.inscription_id AND i.statut = 'active'
+      WHERE ai.classe_annuelle_id = $1 AND ai.active = true`, [classId]);
+    const name = `Brouillon ${classInfo.code_affichage} · ${classInfo.annee_libelle}`;
+    const result = await query(`INSERT INTO cartes_brouillons (annee_scolaire_id, site_id, classe_annuelle_id, nom, total_cartes, statut)
+      VALUES ($1, $2, $3, $4, $5, 'pret') RETURNING id, nom, total_cartes, statut, created_at`,
+      [classInfo.annee_scolaire_id, classInfo.site_id, classId, name, students.rows[0].total]);
+    return result.rows[0];
+  }
+
+  static async getManagementClassPreview(classId, scope) {
+    const preview = await this.preview(classId, scope);
+    return { ...preview, etablissement: await this.identity() };
   }
     static async identity() {
     const result = await query('SELECT id, nom, slogan, signature_path FROM etablissement WHERE singleton = true');

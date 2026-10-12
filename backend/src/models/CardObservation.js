@@ -47,6 +47,24 @@ export class CardObservation {
     return result.rows;
   }
 
+  static async listForManagement(scope) {
+    await CardService.assertEnabled();
+    const effective = await CardService.effectiveScope(scope);
+    const result = await query(`SELECT o.id, o.classe_annuelle_id, o.eleve_id, o.auteur_role, o.contenu, o.created_at,
+        u.nom AS auteur_nom, u.prenom AS auteur_prenom,
+        ca.code_affichage AS classe_code, s.nom AS site_nom,
+        e.matricule AS eleve_matricule, e.nom AS eleve_nom, e.prenom AS eleve_prenom
+      FROM cartes_observations o
+      JOIN classes_annuelles ca ON ca.id = o.classe_annuelle_id
+      JOIN sites s ON s.id = ca.site_id
+      JOIN services_cartes_sites scs ON scs.site_id = ca.site_id
+      LEFT JOIN users u ON u.id = o.auteur_id
+      LEFT JOIN eleves e ON e.id = o.eleve_id
+      WHERE ca.site_id = ANY($1::uuid[])
+      ORDER BY o.created_at DESC`, [effective.siteIds]);
+    return result.rows;
+  }
+
   static async listUnread(limit = 20) {
     const result = await query(`SELECT o.id, o.contenu, o.auteur_role, o.created_at, o.classe_annuelle_id,
         u.nom AS auteur_nom, u.prenom AS auteur_prenom,

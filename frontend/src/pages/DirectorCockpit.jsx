@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Building2, CalendarDays, IdCard, MapPin, School, Users } from 'lucide-react';
 import SchoolYearPanel from './SchoolYearPanel';
 const formatNumber = (value) => Number(value || 0).toLocaleString('fr-FR');
@@ -39,9 +38,10 @@ const sortClasses = (classes = []) => [...classes].sort((a, b) => {
     sensitivity: 'base',
   });
 });
-export default function DirectorCockpit({ direction, schoolYears = [], yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear, loadClass, cardService, toggleCards }) {
-  const [selectedCardSites, setSelectedCardSites] = useState([]);
+export default function DirectorCockpit({ direction, schoolYears = [], yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear, loadClass, cardService, activateCardSite }) {
   const sites = direction?.sites || [];
+  const cardSites = cardService?.sites || [];
+  const cardSiteIds = new Set(cardSites.filter((site) => site.confirme_at).map((site) => site.id));
   const classes = sortClasses(direction?.classes || []);
   const classesBySite = sites.map((site) => ({ site, classes: classes.filter((item) => item.site_id === site.id || item.site_nom === site.nom) }));
   const totalStudents = sites.reduce((sum, site) => sum + Number(site.students_count || 0), 0);
@@ -113,13 +113,21 @@ export default function DirectorCockpit({ direction, schoolYears = [], yearForm,
       </span>
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Cartes d’identité scolaire</p>
-        <h3 className="mt-2 font-semibold text-slate-900">{cardService?.actif ? 'Service activé' : cardService?.admin_actif ? 'Prêt à activer' : 'Service non autorisé'}</h3>
+        <h3 className="mt-2 font-semibold text-slate-900">{cardService?.actif ? 'Service activé sur au moins un site' : cardService?.admin_actif ? 'Prêt à activer' : 'Service non autorisé'}</h3>
         <p className="mt-2 text-xs leading-5 text-slate-500">
-          Les classes et effectifs existants sont utilisés sans double saisie. {cardService?.actif ? 'La section Cartes d’identité scolaire est disponible dans la barre latérale.' : cardService?.admin_actif ? (cardService?.sites?.length > 1 ? 'Sélectionnez les sites concernés, puis activez la section.' : 'Activez la section pour ouvrir la préparation des cartes.') : 'En attente de l’autorisation de l’administrateur FVS.'}
+          {cardService?.admin_actif ? 'Activez le service séparément pour chaque site, y compris les sites créés ultérieurement.' : 'En attente de l’autorisation de l’administrateur FVS.'}
         </p>
-        {cardService?.actif && <p className="mt-3 text-xs font-medium text-emerald-700">Sites actifs : {cardService.sites.filter((site) => site.confirme_at).map((site) => site.nom).join(', ')}</p>}
-        {!cardService?.actif && cardService?.admin_actif && cardService?.sites?.length > 1 && <div className="mt-4 space-y-2">{cardService.sites.map((site) => <label key={site.id} className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={selectedCardSites.includes(site.id)} onChange={(event) => setSelectedCardSites((current) => event.target.checked ? [...current, site.id] : current.filter((id) => id !== site.id))} />{site.nom}</label>)}</div>}
-        {!cardService?.actif && cardService?.admin_actif && <button type="button" onClick={() => toggleCards(selectedCardSites)} disabled={cardService?.sites?.length > 1 && !selectedCardSites.length} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Activer la section Cartes</button>}
+        <div className="mt-4 space-y-2">
+          {cardSites.map((site) => {
+            const active = cardSiteIds.has(site.id);
+            return <div key={site.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
+              <span className="text-sm text-slate-700">{site.nom}</span>
+              {active
+                ? <span className="text-xs font-semibold text-emerald-700">Activé</span>
+                : <button type="button" onClick={() => activateCardSite(site.id)} disabled={!cardService?.admin_actif} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Activer</button>}
+            </div>;
+          })}
+        </div>
         {!cardService?.actif && !cardService?.admin_actif && <p className="mt-4 text-xs font-medium text-amber-700">L’administrateur doit d’abord autoriser ce service.</p>}
       </div>
     </div>

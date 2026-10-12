@@ -36,6 +36,21 @@ export class CardNotification {
       yearId = year.rows[0].id;
     }
 
+    let draftId = null;
+    if (type === 'brouillon') {
+      if (classId) {
+        draftId = (await CardService.recordDraft(classId)).id;
+      } else {
+        const classes = await query(`SELECT id FROM classes_annuelles
+          WHERE site_id = $1 AND actif = true AND annee_scolaire_id = $2
+          ORDER BY code_affichage`, [site.id, yearId]);
+        for (const item of classes.rows) {
+          const draft = await CardService.recordDraft(item.id);
+          if (!draftId) draftId = draft.id;
+        }
+      }
+    }
+
     const recipients = await query(`SELECT DISTINCT u.id, u.email, u.role
       FROM users u
       JOIN acces_utilisateur_sites a ON a.user_id = u.id AND a.actif = true
@@ -63,8 +78,8 @@ export class CardNotification {
     const sent = results.filter((item) => item.sent).length;
     if (!sent) throw fail('Aucun email n’a pu être envoyé.', 502);
 
-    await query(`INSERT INTO cartes_notifications (annee_scolaire_id, site_id, classe_annuelle_id, type, date_passage, envoye_par, emails_sent)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)`, [yearId, site.id, classId || null, DB_TYPES[type], passage, adminId, sent]);
+    await query(`INSERT INTO cartes_notifications (brouillon_id, annee_scolaire_id, site_id, classe_annuelle_id, type, date_passage, envoye_par, emails_sent)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [draftId, yearId, site.id, classId || null, DB_TYPES[type], passage, adminId, sent]);
 
     return { sent, failed: results.filter((item) => !item.sent), siteNom: site.nom, classeCode: classCode, type, datePassage: passage };
   }

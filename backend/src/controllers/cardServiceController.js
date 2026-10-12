@@ -10,7 +10,13 @@ export const setCardServiceStatus = async (req, res, next) => {
 };
 
 export const confirmCardServiceSites = async (req, res, next) => {
-  try { res.json(await CardService.confirmSites(req.body.siteIds, req.user.id)); } catch (error) { next(error); }
+  try { res.json(await CardService.confirmSites(req.body.siteIds, req.user.id, await accessScopeFor(req.user))); } catch (error) { next(error); }
+};
+
+export const activateCardServiceSite = async (req, res, next) => {
+  try {
+    res.json(await CardService.activateSite(req.params.siteId, req.user.id, await accessScopeFor(req.user)));
+  } catch (error) { next(error); }
 };
 
 export const previewCards = async (req, res, next) => {

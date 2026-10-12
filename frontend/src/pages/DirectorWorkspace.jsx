@@ -1,4 +1,4 @@
-import { Archive, Building2, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Search, UserRound } from 'lucide-react';
+import { Archive, Building2, IdCard, KeyRound, LayoutDashboard, LifeBuoy, LogOut, Search, UserRound } from 'lucide-react';
 import { PLATFORM_NAME } from '../config/branding';
 import { directionAPI } from '../services/api';
 import DirectorCockpit from './DirectorCockpit';
@@ -12,7 +12,7 @@ export default function DirectorWorkspace({ user, establishmentName, cardService
     { id: 'tableau', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" /> },
     { id: 'archives', label: 'Archives', icon: <Archive className="h-4 w-4" /> },
     { id: 'recherche-eleve', label: 'Rechercher un élève', icon: <Search className="h-4 w-4" /> },
-    ...(cardService?.actif ? [{ id: 'cartes', label: 'Cartes d’identité scolaire', icon: <Building2 className="h-4 w-4" /> }] : []),
+    ...(cardService?.actif ? [{ id: 'cartes', label: 'Cartes d’identité scolaire', icon: <IdCard className="h-4 w-4" /> }] : []),
     { id: 'profil', label: 'Mon profil', icon: <UserRound className="h-4 w-4" /> },
     { id: 'securite', label: 'Sécurité', icon: <KeyRound className="h-4 w-4" /> },
     { id: 'assistance', label: 'Assistance', icon: <LifeBuoy className="h-4 w-4" /> },

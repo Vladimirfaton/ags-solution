@@ -125,6 +125,61 @@ export function UnreadBell({ onError }) {
   );
 }
 
+export function UnreadLostDeclarationsBell({ onError }) {
+  const [items, setItems] = useState([]);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const load = () => cartesAPI.unreadLostDeclarations().then(({ data }) => setItems(data.declarations || [])).catch(() => onError('Impossible de charger les déclarations de cartes perdues.'));
+    load();
+    const timer = setInterval(load, 60000);
+    return () => clearInterval(timer);
+  }, [onError]);
+
+  useEffect(() => {
+    const close = (event) => { if (ref.current && !ref.current.contains(event.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const markRead = async () => {
+    try {
+      await cartesAPI.markLostDeclarationsRead();
+      setItems([]);
+      setOpen(false);
+    } catch {
+      onError('Impossible de marquer les déclarations comme lues.');
+    }
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen((value) => !value)} className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" title="Déclarations de cartes perdues non lues">
+        <Bell className="h-4 w-4" />
+        {items.length > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">{items.length > 9 ? '9+' : items.length}</span>}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-11 z-50 w-96 max-w-[90vw] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <span className="text-sm font-semibold text-slate-800">Cartes perdues{items.length > 0 && <span className="ml-2 text-xs font-medium text-rose-500">{items.length} non lue{items.length > 1 ? 's' : ''}</span>}</span>
+            {items.length > 0 && <button type="button" onClick={markRead} className="text-xs font-medium text-emerald-600">Tout marquer lu</button>}
+          </div>
+          <div className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+            {items.length === 0 ? <p className="py-6 text-center text-sm text-slate-400">Aucune déclaration non lue</p> : items.map((item) => (
+              <div key={item.id} className="px-4 py-3">
+                <div className="mb-1 flex justify-between gap-2 text-xs"><span className="truncate font-medium text-emerald-700">{item.site_nom} · {item.classe}</span><span className="shrink-0 text-slate-400">{formatDateTime(item.created_at)}</span></div>
+                <p className="text-sm font-medium text-slate-700">{item.nom_eleve} {item.prenom_eleve} · {item.matricule}</p>
+                {item.details && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.details}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function NotifyMenu({ siteId, classId, onNotice, onError }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
