@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Check, ChevronRight, Loader2, MapPin, School, Search, Users, X } from 'lucide-react';
 import { cartesAPI } from '../services/api';
 import CardClassPanel from './CardClassPanel';
-import { Empty, NotifyMenu, StatCard, TextInput, formatDateTime, norm, signatureUrl, sortClasses } from '../components/CardAdminShared';
+import { Empty, NotifyMenu, StatCard, TextInput, formatDateTime, norm, signatureUrl, sortClasses } from '../components/cardAdminShared';
 
 const TYPE_LABELS = { brouillon_pret: 'Brouillon prêt', cartes_pretes: 'Cartes prêtes' };
 

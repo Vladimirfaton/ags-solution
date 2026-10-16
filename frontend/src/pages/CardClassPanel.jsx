@@ -3,7 +3,7 @@ import { Check, CreditCard, Download, FileDown, FileText, Image as ImageIcon, Lo
 import QRCode from 'qrcode';
 import { cartesAPI } from '../services/api';
 import ObservationsPanel from '../components/ObservationsPanel';
-import { Empty, NotifyMenu, StatCard, TextInput, formatDateFr, photoUrl, signatureUrl } from '../components/CardAdminShared';
+import { Empty, NotifyMenu, StatCard, TextInput, formatDateFr, photoUrl, signatureUrl } from '../components/cardAdminShared';
 import {
   DEFAULT_CARD_MM, buildQrPayload, fitTitleSize, generateBrouillonPDF, generateCardImages,
   generateFinalCardsPDF, generateSingleCardPDF, getSchoolYear, printFinalCards, wrapText,

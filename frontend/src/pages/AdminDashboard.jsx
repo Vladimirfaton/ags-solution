@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Building2, History, IdCard, Image as ImageIcon, LayoutDashboard, LogOut, MapPin, Plus, School, Users } from 'lucide-react';
 import { cartesAPI, platformAPI } from '../services/api';
 import { PLATFORM_NAME } from '../config/branding';
-import { UnreadBell, UnreadLostDeclarationsBell } from '../components/CardAdminShared';
+import { UnreadBell, UnreadLostDeclarationsBell } from '../components/cardAdminShared';
 import CardAdminPanel from './CardAdminPanel';
 
 const blankSite = { nom: '', commune: '' };
