@@ -1,6 +1,6 @@
 # Contexte durable du projet — FVS / AGS-Solution
 
-> Dernière mise à jour : 9 octobre 2026
+> Dernière mise à jour : 16 octobre 2026
 > Document de continuité pour toute nouvelle session de développement.
 > Ce document décrit les décisions fonctionnelles validées, la cible architecturale et les travaux prévus. Pour connaître l'état exact d'une fonctionnalité, lire le code réel et vérifier les migrations appliquées.
 
@@ -424,7 +424,7 @@ Frontend : React 18, Vite, Tailwind, Axios, React Router, lucide-react, pdf-lib.
 
 Hébergement : frontend Vercel, backend Render plan gratuit, base Supabase.
 
-## 17. État réel mis à jour au 9 octobre 2026
+## 17. État réel mis à jour au 16 octobre 2026
 
 Cette section fait foi pour la reprise du projet. Elle complète les décisions précédentes sans les remplacer.
 
@@ -443,9 +443,9 @@ Implémenté ou présent dans le dépôt :
 
 Les anciens modèles `College`, `Class`, `college_id` et les fichiers du dossier `ref/` sont historiques. Ils ne doivent pas être utilisés pour ajouter une nouvelle fonctionnalité.
 
-### 17.2 Service Cartes d'identité scolaire : mécanisme en place, parcours à finaliser
+### 17.2 Service Cartes d'identité scolaire : interfaces mises à jour
 
-Le service Cartes est distinct de la gestion scolaire. L'autorisation admin, la confirmation des sites et l'aperçu classes/élèves modernes existent côté backend ; le parcours complet de préparation et de génération n'est pas encore branché.
+Le service Cartes est distinct de la gestion scolaire. L'autorisation admin, la confirmation des sites, la préparation des cartes et la génération PDF sont maintenant représentées dans les interfaces dédiées. Le niveau de validation fonctionnelle doit toutefois rester distingué de la présence du branchement dans le code.
 
 Le parcours cible est :
 
@@ -468,14 +468,14 @@ Règles :
 - le nom du site reste présent dans les listes/classes afin de ne pas mélanger les données ;
 - le directeur et la secrétaire doivent avoir les droits Cartes de préparation et de consultation prévus ;
 - la génération finale ne doit jamais être exposée aux comptes de gestion ;
-- chaque requête Cartes doit appliquer à la fois la portée utilisateur et les sites confirmés ; ce contrôle reste à vérifier et à terminer ;
+- chaque requête Cartes doit appliquer à la fois la portée utilisateur et les sites confirmés ; ce contrôle reste à vérifier en environnement réel et dans les tests multi-site ;
 - le libellé utilisateur est « Cartes d'identité scolaire », pas « FVS Cartes ».
 
 Migration ajoutée et appliquée :
 
 - `1791000000000_activation-cartes-par-sites.js` ajoute `modules_plateforme.admin_actif` et la table `services_cartes_sites`.
 
-Le modèle `CardService` expose l'autorisation admin, les sites confirmés, les statistiques et l'aperçu de classes modernes. Les routes Cartes utilisent les tables modernes et `AccessScope`. Ces éléments ne valident pas à eux seuls le filtrage sur les sites confirmés ni le parcours complet de préparation/génération.
+Le modèle `CardService` expose l'autorisation admin, les sites confirmés, les statistiques et les aperçus modernes. Les routes Cartes utilisent les tables modernes et `AccessScope`. Les composants frontend dédiés couvrent désormais la gestion admin, les classes/élèves, le brouillon, les observations, les notifications, les photos et l'export PDF selon le rôle.
 
 ### 17.3 Stockage des photos et signatures
 
@@ -504,39 +504,34 @@ Validation actuelle : `6` fichiers de tests, `17` tests passés, `0` échec.
 
 Présent :
 
-- `AdminDashboard.jsx` contient l'autorisation admin du service Cartes ;
+- `AdminDashboard.jsx` contient l'autorisation admin et les trois sections du dashboard Cartes : classes/élèves, identité des cartes et notifications ;
+- `CardAdminPanel.jsx` gère l'identité des cartes, les classes et élèves côté admin, les aperçus, les notifications et la génération finale ;
+- `CardClassPanel.jsx` fournit l'affichage détaillé d'une classe, le brouillon, les cartes finales, les photos, les observations et les exports A4/PVC ;
 - `DirectorCockpit.jsx` affiche le consentement et la sélection des sites ;
-- `DirectorWorkspace.jsx` affiche la section Cartes seulement après activation ;
+- `DirectorWorkspace.jsx` affiche la section Cartes seulement après activation et la branche vers le panneau de gestion Cartes ;
 - `ManagementWorkspace.jsx` affiche la section Cartes à la secrétaire après activation de son site ;
-- `CardServicePanel.jsx` sait charger un aperçu de classe et de ses élèves via les routes modernes ;
-- la génération PDF est masquée pour la direction et la secrétaire.
+- `ManagementWorkspace.jsx` fournit maintenant une navigation distincte pour les rôles secrétaire et comptable :
+  - secrétaire : tableau de bord, classes et élèves, capacité des classes, profil, sécurité et assistance ;
+  - comptable : tableau de bord, inscriptions, frais et tarifs, caisse, historique des paiements, échéances dépassées, profil, sécurité et assistance ;
+- `ManagementDashboard.jsx` charge les données adaptées au rôle et relie les actions aux API modernes : création/modification des classes et transferts côté secrétaire, inscriptions/réinscriptions et opérations financières côté comptable ;
+- `DirectorWorkspace.jsx` expose désormais au directeur le tableau de bord, les archives en lecture seule, la recherche d'élèves par site, les cartes si le service est actif, le profil, la sécurité et l'assistance ;
+- `DirectorCockpit.jsx` affiche la synthèse multisite, les effectifs, les classes actives et la configuration de l'année scolaire ;
+- `SchoolYearPanel.jsx` fournit au directeur la préparation, l'activation, la clôture et la consultation des archives de classes/élèves ;
+- `CardManagementPanel.jsx` est utilisé par la direction et le secrétariat pour les classes/élèves, brouillons, observations, photos et notifications ;
+- la génération finale reste réservée au dashboard admin ; les comptes direction/secrétariat ne doivent pas recevoir ce droit.
 
-Le branchement d'interface reste partiel : `RoleContent` monte actuellement `CardServicePanel` avec la liste des classes seulement. Le panneau ne reçoit donc pas encore tout le contexte d'activation, de site et de droits nécessaire au parcours complet. La présence de l'entrée de menu et de l'aperçu ne signifie pas que les brouillons, observations, notifications et la génération admin sont intégrés.
+Le branchement frontend des trois espaces Cartes a été mis à jour. Les vérifications restantes portent sur le comportement réel navigateur, l'isolation multi-site, le Storage et la validation complète des routes en environnement réel.
 
 Le dossier `ref/` reste uniquement une source de comportement et de mise en page. Il ne doit pas être importé directement dans l'application.
 
 ### 17.6 Travaux encore restants
 
-**Prochaine phase : finaliser le branchement de la section Cartes.** Procéder par étapes et vérifier chaque parcours sur les routes et données modernes :
+**Prochaine phase : valider le branchement mis à jour de la section Cartes.** Procéder par étapes et vérifier chaque parcours sur les routes et données modernes :
 
-1. Brancher complètement la section directeur/secrétaire à l'état du service, aux sites confirmés et aux classes accessibles ; conserver la séparation des droits et ne pas exposer la génération finale aux comptes de gestion.
-2. Finaliser l'espace de préparation directeur/secrétaire à partir du comportement de `ref/DashboardGestion.jsx` :
-   - onglet Élèves ;
-   - onglet Brouillon ;
-   - onglet Observations ;
-   - notifications et état « brouillon prêt » ;
-   - actions limitées au site autorisé.
-3. Finaliser le dashboard admin de génération à partir du comportement de `ref/Dashboard.jsx` :
-   - navigation par site ;
-   - classes et élèves modernes ;
-   - aperçu brouillon ;
-   - génération finale A4/PVC avec données de l'établissement ;
-   - aucune référence à `College`, `Class` ou `college_id`.
-4. Ajouter les opérations modernes de lecture/écriture des brouillons, observations et notifications : les routes/modèles actuellement repérés couvrent l'état du service, la confirmation des sites, les statistiques et l'aperçu élèves/classe, mais pas encore ce flux complet.
-5. Vérifier que toutes les requêtes Cartes appliquent à la fois la portée utilisateur et la sélection enregistrée dans `services_cartes_sites`, afin qu'aucun site non confirmé ne soit consultable ou générable.
-6. Vérifier le bucket `ads-uploads`, les politiques Storage Supabase et les URLs publiques/signées en environnement réel.
-7. Corriger ou confirmer le build frontend, précédemment bloqué localement par `Cannot read directory "../..": Access is denied` dans esbuild Windows.
-8. Effectuer un test manuel multi-site : site A/site B, directeur et secrétaire, isolation des données, photos Storage, brouillon, observation, notifications et génération finale admin A4/PVC.
+1. Vérifier en navigateur les parcours admin, directeur et secrétaire après la mise à jour des affichages.
+2. Vérifier que toutes les requêtes Cartes appliquent à la fois la portée utilisateur et la sélection enregistrée dans `services_cartes_sites`, afin qu'aucun site non confirmé ne soit consultable ou générable.
+3. Vérifier le bucket `ads-uploads`, les politiques Storage Supabase et les URLs publiques/signées en environnement réel.
+4. Effectuer un test manuel multi-site : site A/site B, directeur et secrétaire, isolation des données, photos Storage, brouillon, observation, notifications et génération finale admin A4/PVC.
 
 Ne pas reprendre la génération finale comme une action de la direction ou du secrétariat. Ne pas réutiliser les anciens écrans comme dépendances de production et ne pas considérer la section Cartes comme finalisée sur la seule base de son entrée de menu.
 
@@ -557,7 +552,7 @@ Le système devra distinguer :
 
 Lorsqu'une année est clôturée, elle doit devenir entièrement en lecture seule et rester consultable dans une section Archives. Chaque compte de gestion devra disposer d'une navigation adaptée à ses permissions pour sélectionner une année archivée et retrouver les informations de son périmètre. Les données historiques ne doivent pas être supprimées ni confondues avec les données de l'année active.
 
-État actuel à ne pas confondre avec cette vision : la base contient déjà le statut `archivee`, la clôture transforme l'année active en année archivée, et l'espace Directeur expose une consultation limitée des classes et élèves archivés. En revanche, les espaces Secrétaire, Comptable et Censeur restent actuellement dépendants de l'année `active` et ne proposent pas encore de contexte d'année sélectionnable ni de section Archives complète.
+État actuel à ne pas confondre avec cette vision : la base contient déjà le statut `archivee`, la clôture transforme l'année active en année archivée, et l'espace Directeur expose une consultation limitée des classes et élèves archivés. Les espaces Secrétaire et Comptable ont maintenant des dashboards dédiés, mais leurs opérations restent branchées sur l'année active et ne proposent pas encore de contexte d'année sélectionnable ni de section Archives complète. Le Censeur reste également dépendant de l'année active.
 
 Cette évolution nécessitera un chantier transversal : contexte d'année côté serveur, contrôle des permissions par année, remplacement progressif des requêtes dépendant implicitement de `statut = 'active'`, préparation contrôlée des structures et réinscriptions, clôture transactionnelle, interfaces par rôle et tests de non-écriture dans les archives.
 
@@ -579,6 +574,15 @@ npm.cmd test
 Ne jamais appliquer une migration destructive sans vérifier la cible, le backup et le contenu réel de la base. La migration `1790339258594_remodelage-db.js` reste particulièrement sensible car elle contient une reconstruction destructive avec `TRUNCATE ... CASCADE`.
 
 ### 17.9 Évolutions récentes — secrétariat et comptabilité
+
+**Dashboards de gestion :**
+
+- la navigation et les intitulés sont maintenant adaptés au rôle dans `ManagementWorkspace` ;
+- le dashboard Directeur est séparé dans `DirectorWorkspace` et comprend les archives en lecture seule ainsi qu'une recherche d'élèves par site ;
+- le dashboard Secrétaire regroupe la gestion des classes et élèves, les capacités de classes, les transferts, le profil et la sécurité ;
+- le dashboard Comptable regroupe les inscriptions/réinscriptions, frais et tarifs, caisse, historique des paiements et échéances dépassées ;
+- les données sont rafraîchies selon le rôle dans `ManagementDashboard`, avec des appels séparés aux API Direction, Secrétariat et Comptabilité ;
+- cette description constate le branchement présent dans le code. Les validations fonctionnelles navigateur et les tests ciblés restent à exécuter séparément.
 
 **Secrétariat — recherche des classes :**
 
