@@ -12,6 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 // Pages espace gestion (directeur / secrétaire)
 import LoginGestion from './pages/LoginGestion';
 import ManagementDashboard from './pages/ManagementDashboard';
+import { PageSkeleton } from './components/Skeleton';
 
 const API_URL = import.meta.env.VITE_API_URL;
 axios.defaults.baseURL = API_URL;
@@ -28,14 +29,7 @@ const getStoredUser = () => {
 // et redirige vers le bon dashboard sinon (jamais un 403 silencieux côté UI).
 const PrivateRoute = ({ children, isAuthenticated, loading, allowedRoles, loginPath = '/gestion' }) => {
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#f7faf8]">
-        <div className="flex items-center gap-2 text-slate-400">
-          <div className="w-5 h-5 border-2 border-slate-200 border-t-emerald-600 rounded-full animate-spin" />
-          <span className="text-sm">Chargement</span>
-        </div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   if (!isAuthenticated) return <Navigate to={loginPath} />;

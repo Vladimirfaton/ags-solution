@@ -35,8 +35,8 @@ export const authorize = (roles = []) => (req, res, next) => {
   next();
 };
 export const ROLE_PERMISSIONS = Object.freeze({
- directeur: ['etablissement.consulter', 'annee_scolaire.gerer', 'classe.consulter', 'eleve.consulter', 'fvs.consulter', 'fvs.activer'],
- secretaire: ['classe.consulter', 'classe.gerer', 'eleve.consulter', 'eleve.modifier', 'eleve.transferer', 'fvs.consulter'],
+ directeur: ['etablissement.consulter', 'annee_scolaire.gerer', 'classe.consulter', 'eleve.consulter'],
+ secretaire: ['classe.consulter', 'classe.gerer', 'eleve.consulter', 'eleve.modifier', 'eleve.transferer'],
  comptable: ['classe.consulter', 'eleve.consulter', 'inscription.creer', 'frais.gerer', 'caisse.gerer'],
  censeur: [
    'classe.consulter',
@@ -44,7 +44,6 @@ export const ROLE_PERMISSIONS = Object.freeze({
    'professeur.consulter',
    'professeur.gerer',
    'professeur.affecter_classes',
-   'fvs.consulter',
  ],
 });
 export const authorizePermission = (...permissions) => (req, res, next) => {

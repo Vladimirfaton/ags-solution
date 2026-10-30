@@ -45,8 +45,13 @@ export const register = async (req, res) => {
     if (!email || !password || !confirmPassword) return res.status(400).json({ error: 'Tous les champs sont requis' });
     if (password !== confirmPassword || !isValidPassword(password)) return res.status(400).json({ error: 'Mot de passe invalide ou non confirmé' });
     if (await Admin.count()) return res.status(403).json({ error: 'Le premier administrateur existe déjà.' });
+    if (await User.findByEmail(email)) return res.status(409).json({ error: 'Cet email est déjà utilisé par un autre utilisateur.' });
     return res.status(201).json(await issueSession(await Admin.create(email, password), req, 'admin'));
-  } catch (error) { logger.error(`Création admin: ${error.message}`); return res.status(500).json({ error: "Erreur lors de l'enregistrement" }); }
+  } catch (error) {
+    logger.error(`Création admin: ${error.message}`);
+    if (error.code === '23505') return res.status(409).json({ error: 'Cet email est déjà utilisé par un autre utilisateur.' });
+    return res.status(500).json({ error: "Erreur lors de l'enregistrement" });
+  }
 };
 export const resendOtp = async (req, res) => {
   try { const user = await Admin.findByEmail(req.body.email || ''); if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' }); const otpCode = generateOTP(); await saveOTP(user.email, otpCode); await sendOtpEmail(user.email, otpCode); return res.json({ message: 'Nouveau code envoyé', email: user.email }); }
@@ -98,4 +103,10 @@ export const resetPassword = async (req, res) => {
   if (!(await User.resetPassword(hash(token), password))) return res.status(401).json({ error: 'Lien invalide ou expiré' });
   return res.json({ success: true });
 };
-export const bootstrapStatus = async (_req, res) => res.json({ adminExists: (await Admin.count()) > 0 });
+export const bootstrapStatus = async (_req, res, next) => {
+  try {
+    res.json({ adminExists: (await Admin.count()) > 0 });
+  } catch (error) {
+    next(error);
+  }
+};

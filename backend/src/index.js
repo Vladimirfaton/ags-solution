@@ -12,7 +12,6 @@ import directionRoutes from './routes/directionRoutes.js';
 import secretariatRoutes from './routes/secretariatRoutes.js';
 import comptabiliteRoutes from './routes/comptabiliteRoutes.js';
 import censeurRoutes from './routes/censeurRoutes.js';
-import cardServiceRoutes from './routes/cardServiceRoutes.js';
 import { validateEnv } from './config/validateEnv.js';
 import { PLATFORM_NAME } from './config/branding.js';
 
@@ -32,7 +31,6 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-app.use('/uploads', express.static('./uploads'));
 
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path}`);
@@ -46,7 +44,6 @@ app.use('/api/direction', directionRoutes);
 app.use('/api/secretariat', secretariatRoutes);
 app.use('/api/comptabilite', comptabiliteRoutes);
 app.use('/api/censeur', censeurRoutes);
-app.use('/api/cartes', cardServiceRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

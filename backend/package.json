@@ -1,7 +1,7 @@
 {
-  "name": "fvs-cartes-backend",
+  "name": "ags-solution-backend",
   "version": "1.0.0",
-  "description": "Backend API pour plateforme FVS - Cartes d'identité scolaires",
+  "description": "API de gestion scolaire AGS-Solution",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -12,8 +12,8 @@
     "test:watch": "vitest"
   },
   "keywords": [
-    "fvs",
-    "cartes",
+    "ags-solution",
+    "gestion-scolaire",
     "identité",
     "scolaire"
   ],
@@ -34,7 +34,6 @@
     "lucide-react": "^1.31.0",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.23.0",
-    "qrcode": "^1.5.3",
     "sharp": "^0.35.5",
     "uuid": "^9.0.1",
     "winston": "^3.11.0"

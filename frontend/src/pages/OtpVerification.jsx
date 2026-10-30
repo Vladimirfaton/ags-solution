@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { IdCard, Loader2 } from 'lucide-react';
+import { Loader2, School } from 'lucide-react';
 import { authAPI } from '../services/api';
 import { PLATFORM_NAME } from '../config/branding';
 
@@ -73,7 +73,7 @@ export default function OtpVerification({ onLoginSuccess }) {
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-8 w-full max-w-sm">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center">
-            <IdCard className="w-5 h-5 text-white" />
+            <School className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="text-base font-semibold text-slate-800 leading-tight">{PLATFORM_NAME}</h1>

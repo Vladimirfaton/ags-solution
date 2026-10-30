@@ -1,4 +1,4 @@
-import { Building2, CalendarDays, IdCard, MapPin, School, Users } from 'lucide-react';
+import { Building2, CalendarDays, MapPin, School, Users } from 'lucide-react';
 import SchoolYearPanel from './SchoolYearPanel';
 const formatNumber = (value) => Number(value || 0).toLocaleString('fr-FR');
 const classRank = (value = '') => {
@@ -38,10 +38,8 @@ const sortClasses = (classes = []) => [...classes].sort((a, b) => {
     sensitivity: 'base',
   });
 });
-export default function DirectorCockpit({ direction, schoolYears = [], yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear, loadClass, cardService, activateCardSite }) {
+export default function DirectorCockpit({ direction, schoolYears = [], yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear }) {
   const sites = direction?.sites || [];
-  const cardSites = cardService?.sites || [];
-  const cardSiteIds = new Set(cardSites.filter((site) => site.confirme_at).map((site) => site.id));
   const classes = sortClasses(direction?.classes || []);
   const classesBySite = sites.map((site) => ({ site, classes: classes.filter((item) => item.site_id === site.id || item.site_nom === site.nom) }));
   const totalStudents = sites.reduce((sum, site) => sum + Number(site.students_count || 0), 0);
@@ -76,7 +74,7 @@ export default function DirectorCockpit({ direction, schoolYears = [], yearForm,
                   <div className="flex items-start gap-3">
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-500"><MapPin className="h-4 w-4" /></span>
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-800" title={site.nom}>{site.nom}</p>
+                      <p className="break-words whitespace-normal font-semibold text-slate-800" title={site.nom}>{site.nom}</p>
                       <p className="mt-1 text-xs text-slate-500">{site.est_principal ? 'Site principal' : 'Filiale'}{site.commune ? ` · ${site.commune}` : ''}</p>
                       <p className="mt-3 text-xs font-semibold text-emerald-700">{site.classes_count || 0} classe(s) · {formatNumber(site.students_count)} élève(s)</p>
                     </div>
@@ -105,33 +103,6 @@ export default function DirectorCockpit({ direction, schoolYears = [], yearForm,
 
         <aside className="space-y-5">
   <SchoolYearPanel {...{ direction, schoolYears, yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear }} />
-
-  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-    <div className="flex items-start gap-3">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
-        <IdCard className="h-4 w-4" />
-      </span>
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Cartes d’identité scolaire</p>
-        <h3 className="mt-2 font-semibold text-slate-900">{cardService?.actif ? 'Service activé sur au moins un site' : cardService?.admin_actif ? 'Prêt à activer' : 'Service non autorisé'}</h3>
-        <p className="mt-2 text-xs leading-5 text-slate-500">
-          {cardService?.admin_actif ? 'Activez le service séparément pour chaque site, y compris les sites créés ultérieurement.' : 'En attente de l’autorisation de l’administrateur FVS.'}
-        </p>
-        <div className="mt-4 space-y-2">
-          {cardSites.map((site) => {
-            const active = cardSiteIds.has(site.id);
-            return <div key={site.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
-              <span className="text-sm text-slate-700">{site.nom}</span>
-              {active
-                ? <span className="text-xs font-semibold text-emerald-700">Activé</span>
-                : <button type="button" onClick={() => activateCardSite(site.id)} disabled={!cardService?.admin_actif} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Activer</button>}
-            </div>;
-          })}
-        </div>
-        {!cardService?.actif && !cardService?.admin_actif && <p className="mt-4 text-xs font-medium text-amber-700">L’administrateur doit d’abord autoriser ce service.</p>}
-      </div>
-    </div>
-  </section>
 
   <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
     <h3 className="font-semibold text-slate-900">État de l’établissement</h3>

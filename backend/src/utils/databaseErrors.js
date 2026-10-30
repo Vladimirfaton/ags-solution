@@ -23,7 +23,7 @@ export const isDatabaseUnavailable = (error) => {
 export const sendDatabaseUnavailable = (res) => {
   res.set('Retry-After', '10');
   return res.status(503).json({
-    error: 'Service de données temporairement indisponible',
+    error: 'La connexion au service est instable ou momentanément interrompue. Vérifiez votre connexion Internet, puis réessayez.',
     code: 'DATABASE_UNAVAILABLE',
   });
 };

@@ -28,7 +28,11 @@ export const updateClassCapacity = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 export const listStudentsByClass = async (req, res, next) => {
-  try { res.json(await StudentRegistry.listByClass(req.params.classId, await accessScopeFor(req.user))); } catch (error) { next(error); }
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 10));
+    res.json(await StudentRegistry.listByClass(req.params.classId, await accessScopeFor(req.user), { search: req.query.recherche || '', page, pageSize }));
+  } catch (error) { next(error); }
 };
 export const createClass = async (req, res, next) => {
   try {

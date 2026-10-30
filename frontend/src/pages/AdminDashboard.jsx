@@ -1,27 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Building2, History, IdCard, Image as ImageIcon, LayoutDashboard, LogOut, MapPin, Plus, School, Users } from 'lucide-react';
-import { cartesAPI, platformAPI } from '../services/api';
+import { Building2, LayoutDashboard, LogOut, MapPin, Plus, Users } from 'lucide-react';
+import { platformAPI } from '../services/api';
 import { PLATFORM_NAME } from '../config/branding';
-import { UnreadBell, UnreadLostDeclarationsBell } from '../components/cardAdminShared';
-import CardAdminPanel from './CardAdminPanel';
+import { PageSkeleton } from '../components/Skeleton';
 
 const blankSite = { nom: '', commune: '' };
 
-const BASE_MENU = [
+const MENU = [
   { id: 'tableau', label: 'Établissement', icon: LayoutDashboard },
-  { id: 'service', label: 'Service Cartes', icon: IdCard },
-];
-
-const CARD_MENU = [
-  { id: 'cartes-classes', label: 'Classes et élèves', icon: School },
-  { id: 'cartes-identite', label: 'Identité des cartes', icon: ImageIcon },
-  { id: 'cartes-notifications', label: 'Notifications', icon: History },
 ];
 
 export default function AdminDashboard({ onLogout }) {
   const [ready, setReady] = useState(null);
   const [overview, setOverview] = useState(null);
-  const [cardService, setCardService] = useState(null);
   const [section, setSection] = useState('tableau');
   const [nom, setNom] = useState('');
   const [type, setType] = useState('college');
@@ -32,9 +23,8 @@ export default function AdminDashboard({ onLogout }) {
   const [error, setError] = useState('');
 
   const load = async () => {
-    const [{ data }, cards] = await Promise.all([platformAPI.overview(), cartesAPI.status()]);
+    const { data } = await platformAPI.overview();
     setOverview(data);
-    setCardService(cards.data);
   };
 
   useEffect(() => {
@@ -69,14 +59,9 @@ export default function AdminDashboard({ onLogout }) {
     } catch (err) { setError(err.response?.data?.error || 'Création du site impossible.'); }
   };
 
-  const toggleCards = async () => {
-    try { await cartesAPI.setAdminStatus(!cardService?.admin_actif); await load(); }
-    catch (err) { setError(err.response?.data?.error || 'Activation du service impossible.'); }
-  };
-
   const updateSite = (index, key, value) => setSites(sites.map((site, current) => (current === index ? { ...site, [key]: value } : site)));
 
-  if (ready === null) return <main className="grid min-h-screen place-items-center bg-[#f7faf8] text-slate-500">Chargement...</main>;
+  if (ready === null) return <PageSkeleton />;
 
   if (!ready) {
     return (
@@ -96,10 +81,7 @@ export default function AdminDashboard({ onLogout }) {
     );
   }
 
-  const cardsOn = Boolean(cardService?.admin_actif);
-  const current = section.startsWith('cartes-') && !cardsOn ? 'service' : section;
-  const menu = [...BASE_MENU, ...(cardsOn ? CARD_MENU : [])];
-  const confirmedSites = (cardService?.sites || []).filter((site) => site.confirme_at);
+  const current = section === 'tableau' ? section : 'tableau';
 
   const navButton = (item, mobile = false) => {
     const Icon = item.icon;
@@ -122,13 +104,7 @@ export default function AdminDashboard({ onLogout }) {
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <p className="mb-3 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Administration</p>
-          <nav className="space-y-1">{BASE_MENU.map((item) => navButton(item))}</nav>
-          {cardsOn && (
-            <>
-              <p className="mb-3 mt-8 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Cartes d’identité scolaire</p>
-              <nav className="space-y-1">{CARD_MENU.map((item) => navButton(item))}</nav>
-            </>
-          )}
+          <nav className="space-y-1">{MENU.map((item) => navButton(item))}</nav>
         </div>
         <div className="shrink-0 border-t border-slate-100 p-4"><button type="button" onClick={onLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm text-slate-500 hover:bg-slate-50"><LogOut className="h-4 w-4" />Déconnexion</button></div>
       </aside>
@@ -142,13 +118,11 @@ export default function AdminDashboard({ onLogout }) {
                 <p className="mt-1 truncate text-xs text-slate-500">{overview?.etablissement?.nom}</p>
               </div>
               <div className="flex items-center gap-2">
-                {cardsOn && <UnreadBell onError={setError} />}
-                {cardsOn && <UnreadLostDeclarationsBell onError={setError} />}
                 <button type="button" onClick={onLogout} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 md:hidden"><LogOut className="h-4 w-4" />Déconnexion</button>
               </div>
             </div>
           </header>
-          <nav className="border-b border-slate-200 bg-white px-3 md:hidden"><div className="flex gap-1 overflow-x-auto">{menu.map((item) => navButton(item, true))}</div></nav>
+          <nav className="border-b border-slate-200 bg-white px-3 md:hidden"><div className="flex gap-1 overflow-x-auto">{MENU.map((item) => navButton(item, true))}</div></nav>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -185,34 +159,6 @@ export default function AdminDashboard({ onLogout }) {
               </div>
             )}
 
-            {current === 'service' && (
-              <div className="space-y-5">
-                <div><h2 className="text-2xl font-semibold tracking-tight text-emerald-700">Service Cartes d’identité scolaire</h2><p className="mt-1 text-sm text-slate-500">Autorisez le service, puis la direction confirme les sites concernés.</p></div>
-                <section className="rounded-xl border bg-white p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div><h3 className="font-semibold">Autorisation</h3><p className="mt-1 text-sm text-slate-500">Une fois autorisé, les sections Classes, Identité et Notifications s’ouvrent dans le menu.</p></div>
-                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${cardsOn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{cardsOn ? 'Autorisé' : 'Non autorisé'}</span>
-                  </div>
-                  <button type="button" onClick={toggleCards} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">{cardsOn ? 'Désactiver le service' : 'Activer services carte d’identité'}</button>
-                </section>
-                {cardsOn && (
-                  <section className="rounded-xl border bg-white p-6">
-                    <h3 className="font-semibold">Sites confirmés par la direction</h3>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {(cardService?.sites || []).map((site) => (
-                        <div key={site.id} className="flex items-center justify-between gap-3 rounded-xl border p-4">
-                          <div className="min-w-0"><p className="truncate text-sm font-medium">{site.nom}</p><p className="mt-1 text-xs text-slate-500">{site.est_principal ? 'Site principal' : 'Filiale'}</p></div>
-                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${site.confirme_at ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{site.confirme_at ? 'Confirmé' : 'En attente'}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {!confirmedSites.length && <p className="mt-4 text-xs text-amber-700">Aucun site confirmé : la direction doit activer la section Cartes dans son cockpit.</p>}
-                  </section>
-                )}
-              </div>
-            )}
-
-            {current.startsWith('cartes-') && <CardAdminPanel section={current} />}
           </div>
         </div>
       </main>

@@ -3,8 +3,10 @@
 > **Règle d'or** : ce fichier doit être mis à jour à chaque nouvelle migration.
 > Une migration qui change le schéma sans mise à jour de ce fichier est incomplète.
 
-**Dernière synchronisation avec la DB réelle :** 26 août 2026 (vérifié via `information_schema` sur Supabase)
+**Dernière synchronisation avec la DB réelle :** document historique à ne pas utiliser comme état courant.
 **Système de migrations :** `node-pg-migrate`, dossier `migrations/`, table de suivi `pgmigrations`
+
+> Attention : ce document décrit encore une partie de l'ancien modèle FVS Cartes (`colleges`, `classes`, `access_keys`, `payments_kkiapay`). Le fonctionnement actuel AGS-Solution utilise le modèle moderne avec `etablissement`, sites, années scolaires, classes annuelles, inscriptions, finances et service Cartes moderne. Une documentation consolidée sera produite avec la migration `point_de_depart` avant le déploiement VPS.
 **Ancien système (abandonné) :** `src/utils/setupDatabase.js` — archivé, ne plus exécuter, conservé pour historique uniquement.
 
 ---
@@ -14,7 +16,7 @@
 FVS gère aujourd'hui des **collèges** (table `colleges` — sera renommée `etablissements` au Chantier C). Chaque collège a :
 - Des **classes**, qui ont des **élèves**
 - Des **comptes de gestion** (directeur/secrétaire) dans `users`, scopés par `college_id`
-- Une **clé d'accès** (`access_keys`) qui conditionne l'accès à la plateforme
+- Les anciennes clés d'accès (`access_keys`) ne conditionnent plus l'accès à la plateforme ; cette table appartient à l'historique des migrations.
 - Des **brouillons de cartes** et des **notifications** (brouillon prêt, cartes prêtes)
 - Des **observations** laissées par le directeur/secrétaire sur une classe ou un élève
 
@@ -89,7 +91,7 @@ Comptes de la plateforme — admin (créé via `register`) OU directeur/secréta
 
 ---
 
-### `access_keys`
+### `access_keys` — historique
 | Colonne | Type | Nullable | Défaut | Notes |
 |---|---|---|---|---|
 | `id` | uuid | NON | — | PK |
@@ -165,7 +167,7 @@ Même structure que `notifications_brouillon`, + `date_passage` (timestamp) pour
 
 ---
 
-### `payments_kkiapay`
+### `payments_kkiapay` — historique
 ⚠️ Créée manuellement en Phase 5, absente de l'ancien `setupDatabase.js` — maintenant documentée dans la migration baseline.
 
 | Colonne | Type | Nullable | Défaut | Notes |
@@ -199,8 +201,8 @@ Même structure que `notifications_brouillon`, + `date_passage` (timestamp) pour
 
 ## Sécurité — Row Level Security (RLS)
 
-**Activé depuis le 26 août 2026** sur : `access_keys`, `brouillons_cartes`, `classes`, `colleges`, `eleves`, `observations`, `otps`, `users`.
-Déjà protégées par nature : `notifications_brouillon`, `notifications_cartes`, `payments_kkiapay`.
+**Historique :** RLS avait été activé sur : `access_keys`, `brouillons_cartes`, `classes`, `colleges`, `eleves`, `observations`, `otps`, `users`.
+Les tables modernes et leurs portées sont décrites dans les modèles et migrations actuels. Les tables `access_keys` et `payments_kkiapay` ne doivent pas être reprises dans le futur point de départ.
 
 **Aucune policy définie** — RLS activé sans policy = accès total bloqué par défaut via l'API PostgREST publique de Supabase (clé `anon`). Le backend Express contourne RLS nativement car il se connecte via `DATABASE_URL` avec un rôle qui a les privilèges complets — **aucun impact sur le fonctionnement de l'API**.
 
@@ -214,7 +216,7 @@ But : si la clé `anon` de Supabase fuitait un jour, aucun accès direct aux don
 2. Écrire `up` (et `down` si raisonnable) dans ce fichier
 3. Tester en local (`npm run migrate up`, `npm run migrate down` pour vérifier le rollback)
 4. **Mettre à jour ce fichier `SCHEMA.md`** avec le changement
-5. Appliquer en prod avec `npm run migrate up` (déploiement manuel, pas automatique sur Render)
+5. Appliquer en production après sauvegarde et vérification de la cible ; le futur déploiement VPS utilisera une base PostgreSQL administrée sur le VPS ou explicitement désignée.
 
 **Ne jamais** :
 - Modifier le schéma directement dans l'éditeur SQL Supabase sans créer une migration correspondante après coup

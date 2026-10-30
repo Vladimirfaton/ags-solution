@@ -82,6 +82,9 @@ static async setProfile(userId, { nom, prenom, email, telephone, username: reque
   }
 
   if (!cleanEmail) throw Object.assign(new Error('Le nom, le prénom et l’email sont requis.'), { status: 400, expose: true });
+  const duplicateEmail = await query(`SELECT 1 FROM users WHERE LOWER(email) = LOWER($1) AND id <> $2
+    UNION ALL SELECT 1 FROM admins WHERE LOWER(email) = LOWER($1) LIMIT 1`, [cleanEmail, userId]);
+  if (duplicateEmail.rowCount) throw Object.assign(new Error('Cet email est déjà utilisé par un autre utilisateur.'), { status: 409, expose: true });
   const result = await query(`UPDATE users SET username = $1, username_locked = $2, nom = $3, prenom = $4, email = $5, telephone = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7 RETURNING id, email, role, username, username_locked, nom, prenom, telephone, password_personalized`,
     [username, usernameLocked, cleanNom, cleanPrenom, cleanEmail, telephone?.trim() || null, userId]);
   return result.rows[0];

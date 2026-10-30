@@ -67,17 +67,59 @@ export class StudentRegistry {
       GROUP BY ca.id, s.nom, n.ordre, n.code, n.libelle ORDER BY n.ordre, ca.division_nom`, [allowedLevels, ...siteFilter.params]);
     return result.rows;
   }
-  static async listByClass(classId, scope) {
-    const siteFilter = scopedWhere(scope, 'ca.site_id', 2);
+  static async listByClass(classId, scope, { search = '', page = 1, pageSize = 10 } = {}) {
+    const term = String(search || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const safePage = Math.max(1, Number(page) || 1);
+    const safePageSize = Math.min(50, Math.max(1, Number(pageSize) || 10));
+    const siteFilter = scopedWhere(scope, 'ca.site_id', term ? 3 : 2);
+    const classResult = await query(`SELECT ca.id, ca.code_affichage
+      FROM classes_annuelles ca
+      WHERE ca.id = $1 AND ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND ca.actif = true${scopedWhere(scope, 'ca.site_id', 2).sql}`,
+    [classId, ...scopedWhere(scope, 'ca.site_id', 2).params]);
+    if (!classResult.rowCount) return { classInfo: null, students: [], total: 0, page: safePage, pageSize: safePageSize };
+    const offset = (safePage - 1) * safePageSize;
+    const params = [classId];
+    let searchFilter = '';
+    if (term) {
+      params.push(`%${term}%`);
+      const p = params.length;
+      searchFilter = ` AND (
+        translate(lower(coalesce(e.matricule, '')), 'áàâäãåéèêëíìîïóòôöõúùûüçñ', 'aaaaaaeeeeiiiiooooouuuucn') LIKE $${p}
+        OR translate(lower(coalesce(e.nom, '')), 'áàâäãåéèêëíìîïóòôöõúùûüçñ', 'aaaaaaeeeeiiiiooooouuuucn') LIKE $${p}
+        OR translate(lower(coalesce(e.prenom, '')), 'áàâäãåéèêëíìîïóòôöõúùûüçñ', 'aaaaaaeeeeiiiiooooouuuucn') LIKE $${p}
+        OR translate(lower(coalesce(e.sexe, '')), 'áàâäãåéèêëíìîïóòôöõúùûüçñ', 'aaaaaaeeeeiiiiooooouuuucn') LIKE $${p}
+        OR to_char(e.date_naissance, 'YYYY-MM-DD') LIKE $${p}
+        OR translate(lower(coalesce(e.lieu_naissance, '')), 'áàâäãåéèêëíìîïóòôöõúùûüçñ', 'aaaaaaeeeeiiiiooooouuuucn') LIKE $${p}
+        OR translate(lower(coalesce(e.nationalite, '')), 'áàâäãåéèêëíìîïóòôöõúùûüçñ', 'aaaaaaeeeeiiiiooooouuuucn') LIKE $${p}
+        OR translate(lower(coalesce(e.telephone, '')), 'áàâäãåéèêëíìîïóòôöõúùûüçñ', 'aaaaaaeeeeiiiiooooouuuucn') LIKE $${p}
+        OR translate(lower(coalesce(e.photo_path, '')), 'áàâäãåéèêëíìîïóòôöõúùûüçñ', 'aaaaaaeeeeiiiiooooouuuucn') LIKE $${p}
+      )`;
+      params[p - 1] = `%${term.toLowerCase()}%`;
+    }
+    params.push(...siteFilter.params);
+    const limitIndex = params.length + 1;
+    params.push(safePageSize, offset);
+    const countParams = [classId, ...siteFilter.params];
+    const countResult = await query(`SELECT COUNT(e.id)::int AS total
+      FROM classes_annuelles ca
+      LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true
+      LEFT JOIN inscriptions i ON i.id = ai.inscription_id AND i.statut = 'active'
+      LEFT JOIN eleves e ON e.id = i.eleve_id
+      WHERE ca.id = $1 AND ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND ca.actif = true${siteFilter.sql}${searchFilter}`,
+    term ? [classId, `%${term.toLowerCase()}%`, ...siteFilter.params] : countParams);
     const result = await query(`SELECT ca.id AS classe_id, ca.code_affichage, e.id, e.matricule, e.nom, e.prenom, e.sexe,
       TO_CHAR(e.date_naissance, 'YYYY-MM-DD') AS date_naissance, e.lieu_naissance, e.nationalite, e.telephone
       FROM classes_annuelles ca
       LEFT JOIN affectations_inscription ai ON ai.classe_annuelle_id = ca.id AND ai.active = true
       LEFT JOIN inscriptions i ON i.id = ai.inscription_id AND i.statut = 'active'
       LEFT JOIN eleves e ON e.id = i.eleve_id
-      WHERE ca.id = $1 AND ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND ca.actif = true${siteFilter.sql}
-      ORDER BY e.nom, e.prenom`, [classId, ...siteFilter.params]);
-    return { classInfo: result.rows[0] ? { id: result.rows[0].classe_id, code_affichage: result.rows[0].code_affichage } : null, students: result.rows.filter((row) => row.id) };
+      WHERE ca.id = $1 AND ca.annee_scolaire_id = (SELECT id FROM annees_scolaires WHERE statut = 'active') AND ca.actif = true${siteFilter.sql}${searchFilter}
+      ORDER BY e.nom, e.prenom LIMIT $${limitIndex} OFFSET $${limitIndex + 1}`, params);
+    return {
+      classInfo: { id: classResult.rows[0].id, code_affichage: classResult.rows[0].code_affichage },
+      students: result.rows.filter((row) => row.id),
+      total: Number(countResult.rows[0]?.total || 0), page: safePage, pageSize: safePageSize,
+    };
   }
     static async listByArchivedClass(classId, scope) {
     const siteFilter = scopedWhere(scope, 'ca.site_id', 2);

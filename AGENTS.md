@@ -13,6 +13,7 @@ L'agent travaille en lecture seule par défaut :
 
 hiers réels, routes, modèles, contrôleurs, migrations et tests avant toute proposition ;
 - distinguer l'état validé du code, les décisions d'architecture et les travaux restant à faire ;
+- lorsqu'une modification ou fonctionnalité est explicitement reportée, l'inscrire dans `PROJECT_CONTEXT.md` avec le motif, les impacts à préserver et les conditions de reprise ;
 - après application manuelle d'un patch par le propriétaire, proposer les vérifications adaptées.
 
 Préférer des patches ciblés bloc par bloc aux fichiers complets.
@@ -24,7 +25,8 @@ Préférer des patches ciblés bloc par bloc aux fichiers complets.
 - Application mono-établissement avec site principal et sites/filiales rattachés.
 - Types d'établissement uniquement `primaire` et `college`.
 - Le type `college` inclut le lycée. Aucun type `mixte`.
-- Gestion scolaire et FVS Cartes restent des services distinguables et activables/configurables séparément.
+- Le produit actif est exclusivement la gestion scolaire AGS-Solution ; le module Cartes d'identité scolaire a été retiré.
+- Les migrations et données Cartes historiques sont conservées sans usage par les parcours de gestion ; aucune suppression de schéma ou de données Cartes sans décision séparée.
 
 ## Niveaux et classes
 
@@ -43,7 +45,7 @@ Préférer des patches ciblés bloc par bloc aux fichiers complets.
 - `secretaire` : classes, niveaux selon les droits retenus, registre élèves et transferts ;
 - `comptable` : inscriptions, réinscriptions, scolarité, frais, paiements et caisse ;
 - `censeur` : consultation et fonctions pédagogiques prévues ;
-- administrateur FVS : installation, sites/filiales et services FVS.
+- administrateur FVS : installation, sites/filiales et comptes initiaux.
 
 Les permissions sont contrôlées côté serveur et les données isolées par site lorsque le compte est limité.
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Banknote, CalendarDays, ChevronLeft, ChevronRight, MapPin, Pencil, Plus, School, Search, Users } from 'lucide-react';
-import { authAPI, cartesAPI, censeurAPI, comptabiliteAPI, directionAPI, platformAPI, secretariatAPI } from '../services/api';
+import { authAPI, censeurAPI, comptabiliteAPI, directionAPI, platformAPI, secretariatAPI } from '../services/api';
 import { PLATFORM_NAME } from '../config/branding';
 import { generatePaymentReceiptPDF } from '../utils/paymentReceipt';
 import { matchClassSearch, matchStudentSearch } from '../utils/searchUtils';
@@ -10,7 +10,7 @@ import ManagementWorkspace from './ManagementWorkspace';
 import CenseurPedagogy from './CenseurPedagogy';
 import StudentImportPanel from './StudentImportPanel';
 import AssistancePanel from './AssistancePanel';
-import CardManagementPanel from './CardManagementPanel';
+import { PageSkeleton, ListSkeleton } from '../components/Skeleton';
 import FinanceOverview, { HistoryPanel, OverdueInstallmentsPanel } from './FinanceOverview';
 
 
@@ -31,12 +31,12 @@ function useSecretaryClassSearch(classes, search) {
 }
 
 export default function ManagementDashboard({ onLogout }) {
-  const [user, setUser] = useState(null); const [section, setSection] = useState('tableau'); const [loading, setLoading] = useState(true); const [cardService, setCardService] = useState(null); const [establishmentType, setEstablishmentType] = useState('college');
+  const [user, setUser] = useState(null); const [section, setSection] = useState('tableau'); const [loading, setLoading] = useState(true); const [establishmentType, setEstablishmentType] = useState('college');
   const [financeRefreshKey, setFinanceRefreshKey] = useState(0);
   const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [profileEdit, setProfileEdit] = useState(false);
   const [profile, setProfile] = useState({ nom: '', prenom: '', email: '', telephone: '' }); const [password, setPassword] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [direction, setDirection] = useState(null); const [establishmentName, setEstablishmentName] = useState(''); const [secretaryClasses, setSecretaryClasses] = useState([]); const [censeurClasses, setCenseurClasses] = useState([]); const [classDetail, setClassDetail] = useState(null);
-  const [cash, setCash] = useState(null); const [enrollOptions, setEnrollOptions] = useState(null); const [paymentOptions, setPaymentOptions] = useState([]); const [monitoring, setMonitoring] = useState(null); const [finance, setFinance] = useState(null); const [censeurProfessors, setCenseurProfessors] = useState([]); const [censeurSubjects, setCenseurSubjects] = useState([]);
+  const [cash, setCash] = useState(null); const [enrollOptions, setEnrollOptions] = useState(null); const [paymentOptions, setPaymentOptions] = useState([]); const [monitoring, setMonitoring] = useState(null); const [finance, setFinance] = useState(null);
   const [schoolYears, setSchoolYears] = useState([]); const [yearForm, setYearForm] = useState({ libelle: '', dateDebut: '', dateFin: '' }); const [siteForm, setSiteForm] = useState({ nom: '', adresse: '', commune: '', departement: '', telephone: '', email: '' }); const [classForm, setClassForm] = useState({ nom: '', divisionNom: '', divisionType: '' });
   const [editingStudent, setEditingStudent] = useState(null); const [transferStudent, setTransferStudent] = useState(null);
   const [enrollForm, setEnrollForm] = useState({ type: 'inscription', studentId: '', annualClassId: '', paidFeeConfigIds: [], ...blankStudent });
@@ -47,12 +47,60 @@ export default function ManagementDashboard({ onLogout }) {
     try {
       if (role === 'directeur') { const [overview, years] = await Promise.all([directionAPI.overview(), directionAPI.listSchoolYears()]); setDirection(overview.data); setSchoolYears(years.data?.annees || []); }
       if (role === 'secretaire') setSecretaryClasses((await secretariatAPI.listClasses()).data?.classes || []);
-      if (role === 'comptable') { const [cashData, enrollmentData, paymentData, financialConfiguration] = await Promise.all([comptabiliteAPI.cashOverview(), comptabiliteAPI.enrollmentOptions(), comptabiliteAPI.paymentOptions(), comptabiliteAPI.financialConfiguration()]); const enrollment = enrollmentData.data || {}; const financial = financialConfiguration.data || {}; setCash(cashData.data || null); setEnrollOptions({ ...enrollment, classes: Array.isArray(enrollment.classes) ? enrollment.classes : [], students: Array.isArray(enrollment.students) ? enrollment.students : [] }); setPaymentOptions(Array.isArray(paymentData.data?.students) ? paymentData.data.students : []); setFinance({ ...financial, fees: Array.isArray(financial.fees) ? financial.fees : [], classes: Array.isArray(financial.classes) ? financial.classes : [] }); }
-      if (role === 'censeur') { const [monitoringData, classesData, professorsData, subjectsData] = await Promise.all([censeurAPI.overview(), censeurAPI.listClasses(), censeurAPI.listProfessors(), censeurAPI.listSubjects()]); setMonitoring(monitoringData.data); setCenseurClasses(classesData.data?.classes || []); setCenseurProfessors(professorsData.data?.professeurs || []); setCenseurSubjects(subjectsData.data?.matieres || []); }
+      if (role === 'comptable') {
+        const requests = [comptabiliteAPI.cashOverview()];
+        if (section === 'caisse') requests.push(comptabiliteAPI.paymentOptions());
+        if (section === 'inscriptions') requests.push(comptabiliteAPI.enrollmentOptions(), comptabiliteAPI.financialConfiguration());
+        if (section === 'finances') requests.push(comptabiliteAPI.financialConfiguration());
+        const [cashData, ...sectionData] = await Promise.all(requests);
+        setCash(cashData.data || null);
+        if (section === 'caisse' && sectionData[0]) setPaymentOptions(Array.isArray(sectionData[0].data?.students) ? sectionData[0].data.students : []);
+        if (section === 'inscriptions') {
+          const enrollment = sectionData[0]?.data || {};
+          const financial = sectionData[1]?.data || {};
+          setEnrollOptions({ ...enrollment, classes: Array.isArray(enrollment.classes) ? enrollment.classes : [], students: Array.isArray(enrollment.students) ? enrollment.students : [] });
+          setFinance({ ...financial, fees: Array.isArray(financial.fees) ? financial.fees : [], classes: Array.isArray(financial.classes) ? financial.classes : [] });
+        }
+        if (section === 'finances' && sectionData[0]) {
+          const financial = sectionData[0].data || {};
+          setFinance({ ...financial, fees: Array.isArray(financial.fees) ? financial.fees : [], classes: Array.isArray(financial.classes) ? financial.classes : [] });
+        }
+      }
+      if (role === 'censeur') { const [monitoringData, classesData] = await Promise.all([censeurAPI.overview(), censeurAPI.listClasses()]); setMonitoring(monitoringData.data); setCenseurClasses(classesData.data?.classes || []); }
     } finally { refreshInFlight.current = false; }
   };
-  const loadClass = async (classId) => { try { const api = user.role === 'directeur' ? directionAPI : user.role === 'censeur' ? censeurAPI : secretariatAPI; setClassDetail((await api.listStudentsByClass(classId)).data); } catch { setError('Impossible de charger cette classe.'); } };
-  useEffect(() => { authAPI.getMyProfile().then(async ({ data }) => { setUser(data.user); setProfile({ nom: data.user.nom || '', prenom: data.user.prenom || '', email: data.user.email || '', telephone: data.user.telephone || '' }); const [establishment, cards] = await Promise.all([platformAPI.getEstablishment(), cartesAPI.status(), refresh(data.user.role)]); setEstablishmentName(establishment.data.etablissement?.nom || ''); setEstablishmentType(establishment.data.etablissement?.type || 'college'); setCardService(cards.data); }).catch(() => setError('Impossible de charger votre compte.')).finally(() => setLoading(false)); }, []);
+  const loadClass = async (classId, { page = 1, search = '' } = {}, apply = true) => { try { const api = user.role === 'directeur' ? directionAPI : user.role === 'censeur' ? censeurAPI : secretariatAPI; const { data } = await api.listStudentsByClass(classId, { page, pageSize: 10, recherche: search }); if (apply) setClassDetail(data); return data; } catch { setError('Impossible de charger cette classe.'); return null; } };
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadInitialData = async () => {
+      try {
+        const { data } = await authAPI.getMyProfile();
+        if (cancelled) return;
+
+        setUser(data.user);
+        setProfile({ nom: data.user.nom || '', prenom: data.user.prenom || '', email: data.user.email || '', telephone: data.user.telephone || '' });
+        setLoading(false);
+
+        const [establishment] = await Promise.all([
+          platformAPI.getEstablishment(),
+          refresh(data.user.role),
+        ]);
+
+        if (cancelled) return;
+        setEstablishmentName(establishment.data.etablissement?.nom || '');
+        setEstablishmentType(establishment.data.etablissement?.type || 'college');
+      } catch {
+        if (!cancelled) {
+          setError('Impossible de charger votre compte.');
+          setLoading(false);
+        }
+      }
+    };
+
+    loadInitialData();
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(''), 5000);
@@ -67,10 +115,17 @@ export default function ManagementDashboard({ onLogout }) {
 
 useEffect(() => {
   if (!user) return;
+  if (user.role === 'comptable' && ['caisse', 'inscriptions', 'finances'].includes(section)) {
+    refresh(user.role).catch(() => setError('Actualisation impossible.'));
+  }
+}, [user, section]);
+
+useEffect(() => {
+  if (!user) return;
   if (section === 'finances') return;
   const interval = setInterval(() => { refresh(user.role).catch(() => setError('Actualisation impossible.')); }, 30000);
   return () => clearInterval(interval);
-}, [user, section]);
+  }, [user, section]);
   const action = async (work, success, after) => { setError(''); setNotice(''); try { await work(); await refresh(user.role); if (after) await after(); setNotice(success); return true; } catch (err) { setError(err.response?.data?.error || 'Opération impossible.'); return false; } };
 const saveProfile = (event, requestedUsername) => { event.preventDefault(); action(async () => { const { data } = await authAPI.updateMyProfile({ ...profile, ...(requestedUsername ? { username: requestedUsername } : {}) }); setUser(data.user); sessionStorage.setItem('user', JSON.stringify(data.user)); setProfileEdit(false); }, 'Informations personnelles enregistrées.'); };
   const savePassword = (event) => { event.preventDefault(); setError(''); if (password.newPassword === password.currentPassword) return setError('Le nouveau mot de passe doit être différent de l’ancien.'); if (password.newPassword !== password.confirmPassword) return setError('Le nouveau mot de passe doit être identique dans les deux cases.'); action(async () => { await authAPI.changeMyPassword(password); setPassword({ currentPassword: '', newPassword: '', confirmPassword: '' }); setUser({ ...user, passwordPersonalized: true }); }, 'Mot de passe modifié.'); };
@@ -78,7 +133,7 @@ const saveProfile = (event, requestedUsername) => { event.preventDefault(); acti
  const createNextYear = (event) => { event.preventDefault(); action(() => directionAPI.createSchoolYear(yearForm), 'Brouillon créé : la configuration de l’année précédente a été copiée.', async () => setYearForm({ libelle: '', dateDebut: '', dateFin: '' })); };
   const activateYear = (id) => action(() => directionAPI.activateSchoolYear(id), 'Nouvelle année scolaire activée.');
   const closeYear = (id) => action(() => directionAPI.closeSchoolYear(id), 'Année scolaire clôturée.');
-  const createSite = (event) => { event.preventDefault(); action(() => directionAPI.createSite(siteForm), 'Nouveau site créé.', async () => { setSiteForm({ nom: '', adresse: '', commune: '', departement: '', telephone: '', email: '' }); setCardService((await cartesAPI.status()).data); }); };
+  const createSite = (event) => { event.preventDefault(); action(() => directionAPI.createSite(siteForm), 'Nouveau site créé.', async () => { setSiteForm({ nom: '', adresse: '', commune: '', departement: '', telephone: '', email: '' }); }); };
   const saveFinancialConfiguration = (payload) => action(() => comptabiliteAPI.saveFinancialConfiguration(payload), 'Configuration financière enregistrée.');
   const createClass = (event) => { event.preventDefault(); const niveauCode = classLevelCode(classForm.nom); const primaryLevels = ['CI', 'CP', 'CE1', 'CE2', 'CM1', 'CM2']; const divisionType = classForm.divisionType || (establishmentType === 'primaire' && primaryLevels.includes(niveauCode) ? 'groupe' : ['6e', '5e', '4e', '3e'].includes(niveauCode) ? 'groupe' : ['2nde', '1ere', 'terminale'].includes(niveauCode) ? 'serie' : ''); const valid = establishmentType === 'primaire' ? primaryLevels.includes(niveauCode) : !primaryLevels.includes(niveauCode) && Boolean(niveauCode); if (!valid) return setError(establishmentType === 'primaire' ? 'Choisissez un niveau primaire : CI, CP, CE1, CE2, CM1 ou CM2.' : 'Choisissez un niveau collège/lycée : 6ème à Terminale.'); if (!classForm.divisionNom?.trim() || !divisionType) return setError('Indiquez le groupe ou la série de la classe.'); action(() => secretariatAPI.createClass({ niveauCode, divisionNom: classForm.divisionNom.trim(), divisionType }), 'Classe annuelle créée.', async () => setClassForm({ nom: '', divisionNom: '', divisionType: '' })); };
   const updateStudent = (event) => { event.preventDefault(); action(() => secretariatAPI.updateStudent(editingStudent.id, editingStudent), 'Informations de l’élève mises à jour.', async () => { const id = classDetail.classInfo.id; setEditingStudent(null); await loadClass(id); }); };
@@ -101,15 +156,13 @@ const createPayment = async (payload, studentLabel) => {
     setFinanceRefreshKey((k) => k + 1);
   } catch (err) { setError(err.response?.data?.error || 'Paiement impossible.'); }
 };
-  if (loading) return <main className="min-h-screen grid place-items-center bg-slate-50 text-slate-500">Chargement...</main>;
-  const activateCardSite = (siteId) => action(async () => { if (!cardService?.admin_actif) throw Object.assign(new Error('Le service Cartes doit d’abord être autorisé par l’administrateur FVS.'), { response: { data: { error: 'Le service Cartes doit d’abord être autorisé par l’administrateur FVS.' } } }); const { data } = await cartesAPI.activateSite(siteId); setCardService(data); }, 'Service Cartes activé pour ce site.');
-  const toggleCards = (siteIds) => action(async () => { if (!cardService?.admin_actif) throw Object.assign(new Error('Le service Cartes doit d’abord être autorisé par l’administrateur FVS.'), { response: { data: { error: 'Le service Cartes doit d’abord être autorisé par l’administrateur FVS.' } } }); const selected = siteIds || (cardService?.sites?.length === 1 ? [cardService.sites[0].id] : []); const { data } = await cartesAPI.confirmSites(selected); setCardService(data); }, 'Section Cartes activée pour les sites sélectionnés.');
-  const content = section === 'profil' ? <Profile profile={profile} setProfile={setProfile} edit={profileEdit} setEdit={setProfileEdit} save={saveProfile} username={user.username}/> : section === 'securite' ? <Security password={password} setPassword={setPassword} save={savePassword}/> : <RoleContent {...{ user, role: user.role, section, setSection, direction, establishmentName, establishmentType, cardService, toggleCards, finance, saveFinancialConfiguration, secretaryClasses, censeurClasses, classDetail, loadClass, setClassDetail, classForm, setClassForm, createClass, updateClassCapacity, yearForm, setYearForm, createYear, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent, cash, enrollOptions, enrollForm, setEnrollForm, createEnrollment, paymentOptions, createPayment, monitoring,financeRefreshKey}}/>;
-  if (user.role === 'directeur') return <DirectorWorkspace user={user} establishmentName={establishmentName} cardService={cardService} onLogout={onLogout} section={section} setSection={setSection} content={content} error={error} notice={notice} cockpitProps={{ direction, schoolYears, yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear, cardService, toggleCards, activateCardSite }} />;
-  return <ManagementWorkspace role={user.role} user={user} cardService={cardService} establishmentName={establishmentName} section={section} setSection={setSection} onLogout={onLogout} content={content} error={error} notice={notice} />;
+  if (loading) return <PageSkeleton />;
+  const content = section === 'profil' ? <Profile profile={profile} setProfile={setProfile} edit={profileEdit} setEdit={setProfileEdit} save={saveProfile} username={user.username}/> : section === 'securite' ? <Security password={password} setPassword={setPassword} save={savePassword}/> : <RoleContent {...{ user, role: user.role, section, setSection, direction, establishmentName, establishmentType, finance, saveFinancialConfiguration, secretaryClasses, censeurClasses, classDetail, loadClass, setClassDetail, classForm, setClassForm, createClass, updateClassCapacity, yearForm, setYearForm, createYear, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent, cash, enrollOptions, enrollForm, setEnrollForm, createEnrollment, paymentOptions, createPayment, monitoring,financeRefreshKey}}/>;
+  if (user.role === 'directeur') return <DirectorWorkspace user={user} establishmentName={establishmentName} onLogout={onLogout} section={section} setSection={setSection} content={content} error={error} notice={notice} cockpitProps={{ direction, schoolYears, yearForm, setYearForm, createYear, createNextYear, activateYear, closeYear }} />;
+  return <ManagementWorkspace role={user.role} user={user} establishmentName={establishmentName} section={section} setSection={setSection} onLogout={onLogout} content={content} error={error} notice={notice} />;
 }
 
-function RoleContent(props) { if (props.section === 'cartes') return <CardManagementPanel cardService={props.cardService} onNotice={props.onNotice} onError={props.onError}/>; if (props.role === 'directeur') return props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <DirectorCockpit {...props}/>; const view = props.role === 'secretaire' ? (props.section === 'capacites' ? <ClassCapacityPanel classes={props.secretaryClasses} updateCapacity={props.updateClassCapacity} loadClass={props.loadClass} setSection={props.setSection}/> : props.section === 'classes' ? <ClassRegistry {...props} editable/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <SecretaryHome {...props}/>) : props.role === 'comptable' ? (
+function RoleContent(props) { if (props.role === 'directeur') return props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <DirectorCockpit {...props}/>; const view = props.role === 'secretaire' ? (props.section === 'capacites' ? <ClassCapacityPanel classes={props.secretaryClasses} updateCapacity={props.updateClassCapacity} loadClass={props.loadClass} setSection={props.setSection}/> : props.section === 'classes' ? <ClassRegistry {...props} editable/> : props.section === 'assistance' ? <AssistancePanel user={props.user} establishmentName={props.establishmentName}/> : <SecretaryHome {...props}/>) : props.role === 'comptable' ? (
   props.section === 'inscriptions' ? <><Enroll {...props}/><StudentImportPanel/></>
   : props.section === 'finances' ? <FinanceSettings {...props}/>
   : props.section === 'caisse' ? <Accountant {...props}/>
@@ -533,7 +586,7 @@ function ClassCapacityPanel({ classes = [], updateCapacity, loadClass, setSectio
         placeholder="Rechercher une classe, par exemple CI"
       />
     </div>
-    {loading && <p className="mb-3 text-xs text-slate-500">Recherche des classes…</p>}
+    {loading && <ListSkeleton rows={4} />}
     {error && <p role="alert" className="mb-3 text-xs text-rose-700">{error}</p>}
     <div className="grid gap-3 lg:grid-cols-2">
       {visible.map((item) => {
@@ -584,7 +637,7 @@ function ClassRegistry({ editable, secretaryClasses, censeurClasses, classDetail
     setClassForm({ ...classForm, nom, divisionType: automatic, divisionNom: automatic ? classForm.divisionNom : '' });
   };
 
-  if (classDetail?.classInfo) return <ClassStudents {...{ editable, classes, classDetail, setClassDetail, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent }}/>;
+  if (classDetail?.classInfo) return <ClassStudents {...{ editable, classes, classDetail, setClassDetail, loadClass, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent }}/>;
 
   return <>
     <Title title="Classes et élèves" subtitle={editable ? 'Créez une classe, puis ouvrez-la pour gérer les fiches élèves.' : 'Consultation des classes et des élèves.'}/>
@@ -595,22 +648,40 @@ function ClassRegistry({ editable, secretaryClasses, censeurClasses, classDetail
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">{visibleClasses.length ? <div className="divide-y divide-slate-100">{sortClasses(visibleClasses).map((item) => <button key={item.id} type="button" onClick={() => loadClass(item.id)} className="flex w-full items-center gap-4 px-4 py-3 text-left transition hover:bg-emerald-50/40"><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${editable ? 'bg-emerald-50 text-emerald-600' : 'bg-violet-50 text-violet-600'}`}><School className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-900">{item.code_affichage}</span><span className="block truncate text-xs text-slate-500">{establishmentName || item.site_nom || 'Établissement'}</span></span><span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-slate-600"><Users className="h-3.5 w-3.5" />{item.effectif || 0} élève(s)</span><ChevronLeft className="h-4 w-4 rotate-180 text-slate-300" /></button>)}</div> : <div className="p-5"><Empty>{q ? 'Aucune classe ne correspond à la recherche.' : 'Aucune classe annuelle. Le directeur doit d’abord activer l’année scolaire.'}</Empty></div>}</div>
   </>;
 }
-function ClassStudents({ editable, classes, classDetail, setClassDetail, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent }) {
+function ClassStudents({ editable, classes, classDetail, setClassDetail, loadClass, editingStudent, setEditingStudent, updateStudent, transferStudent, setTransferStudent, moveStudent }) {
   const students = classDetail.students || [];
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 10;
-  const visibleStudents = search.trim() ? students.filter((student) => matchStudentSearch(student, search)) : students;
-  const totalPages = Math.max(1, Math.ceil(visibleStudents.length / pageSize));
-  const pageStudents = visibleStudents.slice((page - 1) * pageSize, page * pageSize);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const firstQuery = useRef(true);
+  const requestId = useRef(0);
+  const total = Number(classDetail.total || 0);
+  const totalPages = Math.max(1, Math.ceil(total / Number(classDetail.pageSize || 10)));
+  const pageStudents = students;
   const value = (item, fallback = 'Non renseigné') => item || fallback;
   const setEdit = (key) => (event) => setEditingStudent({ ...editingStudent, [key]: event.target.value });
 
   useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { if (classDetail.page) setPage(classDetail.page); }, [classDetail.page]);
+  useEffect(() => {
+    if (firstQuery.current) { firstQuery.current = false; return undefined; }
+    let active = true;
+    const currentRequestId = ++requestId.current;
+    const timer = setTimeout(async () => {
+      setStudentsLoading(true);
+      try {
+        const data = await loadClass(classDetail.classInfo.id, { page, search }, false);
+        if (active && currentRequestId === requestId.current && data) setClassDetail(data);
+      } finally {
+        if (active && currentRequestId === requestId.current) setStudentsLoading(false);
+      }
+    }, search.trim() ? 250 : 0);
+    return () => { active = false; clearTimeout(timer); };
+  }, [page, search, classDetail.classInfo.id]);
 
   return <>
     <button onClick={() => setClassDetail(null)} className="mb-4 flex gap-1 text-sm text-emerald-700"><ChevronLeft className="w-4"/>Retour aux classes</button>
-    <Title title={classDetail.classInfo.code_affichage} subtitle={`${students.length} élève(s) affecté(s) à cette classe`}/>
+    <Title title={classDetail.classInfo.code_affichage} subtitle={`${total} élève(s) affecté(s) à cette classe`}/>
 
     {editingStudent && (
       <Modal title={`Modifier la fiche de ${editingStudent.nom} ${editingStudent.prenom}`} onClose={() => setEditingStudent(null)}>
@@ -653,7 +724,7 @@ function ClassStudents({ editable, classes, classDetail, setClassDetail, editing
     </div>
 
     <Panel title="Liste des élèves">
-      {pageStudents.length ? (
+      {studentsLoading ? <ListSkeleton rows={5} /> : pageStudents.length ? (
         <>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full table-fixed border-collapse text-left text-xs">
@@ -697,7 +768,7 @@ function ClassStudents({ editable, classes, classDetail, setClassDetail, editing
           </div>
 
           <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-            <span>Page {page} sur {totalPages}</span>
+            <span>Page {page} sur {totalPages} · {total} élève(s)</span>
             <div className="flex gap-2">
               <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
                 <ChevronLeft className="h-3.5 w-3.5" />Précédent

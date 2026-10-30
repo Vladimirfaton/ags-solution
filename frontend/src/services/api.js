@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-export const FILE_BASE_URL = API_URL.replace(/\/api\/?$/, '');
 const api = axios.create({
   baseURL: API_URL,
   timeout: 30000,
@@ -12,16 +11,26 @@ api.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem('token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
+    if (import.meta.env.DEV) config.metadata = { startedAt: performance.now() };
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-const UNAVAILABLE_MESSAGE = 'Service momentanément indisponible. Réessayez dans quelques instants.';
+const OFFLINE_MESSAGE = 'Vous êtes hors ligne ou votre connexion Internet est interrompue. Vérifiez votre connexion, puis réessayez.';
+const UNAVAILABLE_MESSAGE = 'La connexion au service est instable ou momentanément interrompue. Vérifiez votre connexion Internet, puis réessayez.';
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (import.meta.env.DEV && response.config.metadata?.startedAt) {
+      console.debug(`[API] ${response.config.method?.toUpperCase()} ${response.config.url} ${Math.round(performance.now() - response.config.metadata.startedAt)} ms (${response.status})`);
+    }
+    return response;
+  },
   (error) => {
+    if (import.meta.env.DEV && error.config?.metadata?.startedAt) {
+      console.debug(`[API] ${error.config.method?.toUpperCase()} ${error.config.url} ${Math.round(performance.now() - error.config.metadata.startedAt)} ms (erreur ${error.response?.status || error.code || 'réseau'})`);
+    }
     const status = error.response?.status;
 
     if (status === 503) {
@@ -29,7 +38,7 @@ api.interceptors.response.use(
     } else if (status >= 500 && error.response?.data) {
       error.response.data.error = 'Une erreur technique est survenue. Réessayez ou contactez l’assistance.';
     } else if (!error.response && error.code !== 'ERR_CANCELED') {
-      error.response = { status: 0, data: { error: UNAVAILABLE_MESSAGE } };
+      error.response = { status: 0, data: { error: navigator.onLine === false ? OFFLINE_MESSAGE : UNAVAILABLE_MESSAGE } };
     }
 
     if (status === 401) {
@@ -74,7 +83,7 @@ export const platformAPI = {
 
 export const directionAPI = {
   overview: () => api.get('/direction/apercu'),
-  listStudentsByClass: (classId) => api.get(`/direction/classes/${classId}/eleves`),
+  listStudentsByClass: (classId, params = {}) => api.get(`/direction/classes/${classId}/eleves`, { params }),
   createFirstSchoolYear: async ({ libelle, dateDebut, dateFin }) => {
     const { data } = await api.post('/direction/annees-scolaires', {
       libelle,
@@ -96,7 +105,7 @@ export const directionAPI = {
 export const secretariatAPI = {
   listClasses: (search = '') => api.get('/secretariat/classes', { params: { recherche: search } }),
   createClass: (data) => api.post('/secretariat/classes', data),
-  listStudentsByClass: (classId) => api.get(`/secretariat/classes/${classId}/eleves`),
+  listStudentsByClass: (classId, params = {}) => api.get(`/secretariat/classes/${classId}/eleves`, { params }),
   updateClassCapacity: (classId, capacite) => api.put(`/secretariat/classes/${classId}/capacite`, { capacite }),
   updateStudent: (id, data) => api.put(`/secretariat/eleves/${id}`, data),
   transferStudent: (id, destinationClassId, motif) => api.post(`/secretariat/eleves/${id}/transfert`, { destinationClassId, motif }),
@@ -136,7 +145,7 @@ export const comptabiliteAPI = {
 export const censeurAPI = {
   overview: () => api.get('/censeur/apercu'),
   listClasses: () => api.get('/censeur/classes'),
-  listStudentsByClass: (classId) => api.get(`/censeur/classes/${classId}/eleves`),
+  listStudentsByClass: (classId, params = {}) => api.get(`/censeur/classes/${classId}/eleves`, { params }),
   listSubjects: () => api.get('/censeur/matieres'),
   createSubject: (data) => api.post('/censeur/matieres', data),
   updateSubject: (id, data) => api.put(`/censeur/matieres/${id}`, data),
@@ -146,43 +155,6 @@ export const censeurAPI = {
   listAssignments: (id) => api.get(`/censeur/professeurs/${id}/affectations`),
   assignProfessor: (id, data) => api.post(`/censeur/professeurs/${id}/affectations`, data),
   endAssignment: (id) => api.put(`/censeur/affectations/${id}/terminer`),
-};
-
-export const cartesAPI = {
-  status: () => api.get('/cartes/statut'),
-  setAdminStatus: (actif) => api.put('/cartes/autorisation-admin', { actif }),
-  confirmSites: (siteIds) => api.put('/cartes/sites', { siteIds }),
-  activateSite: (siteId) => api.post(`/cartes/sites/${siteId}/activer`),
-  managementData: () => api.get('/cartes/gestion/donnees'),
-  managementDraft: (draftId) => api.get(`/cartes/brouillons/${draftId}`),
-  lostDeclarations: () => api.get('/cartes/declarations-perte'),
-  createLostDeclaration: (data) => api.post('/cartes/declarations-perte', data),
-  adminClasses: () => api.get('/cartes/admin/classes'),
-  adminPreview: (classId) => api.get(`/cartes/admin/classes/${classId}/preview`),
-  stats: () => api.get('/cartes/stats'),
-  preview: (classId) => api.get(`/cartes/classes/${classId}/preview`),
-  listObservations: (classId) => api.get(`/cartes/classes/${classId}/observations`),
-  createObservation: (classId, contenu, eleveId = null) => api.post(`/cartes/classes/${classId}/observations`, { contenu, eleveId }),
-  deleteObservation: (observationId) => api.delete(`/cartes/observations/${observationId}`),
-  unreadObservations: () => api.get('/cartes/admin/observations/non-lues'),
-  markObservationsRead: () => api.put('/cartes/admin/observations/marquer-lues'),
-  unreadLostDeclarations: () => api.get('/cartes/admin/declarations-perte/non-lues'),
-  markLostDeclarationsRead: () => api.put('/cartes/admin/declarations-perte/marquer-lues'),
-  listNotifications: (siteId = null) => api.get('/cartes/admin/notifications', { params: siteId ? { siteId } : {} }),
-  sendNotification: (data) => api.post('/cartes/admin/notifications', data),
-    getIdentity: () => api.get('/cartes/admin/identite'),
-  updateIdentity: (slogan) => api.put('/cartes/admin/identite', { slogan }),
-  uploadSignature: (file) => {
-    const formData = new FormData();
-    formData.append('signature', file);
-    return api.post('/cartes/admin/signature', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
-    updateStudent: (studentId, data) => api.put(`/cartes/admin/eleves/${studentId}`, data),
-  uploadStudentPhoto: (studentId, file) => {
-    const formData = new FormData();
-    formData.append('photo', file);
-    return api.post(`/cartes/admin/eleves/${studentId}/photo`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
 };
 
 export const assistanceAPI = {
